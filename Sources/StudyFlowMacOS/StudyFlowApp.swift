@@ -3,8 +3,22 @@ import StudyFlowKit
 import SwiftData
 import SwiftUI
 
+/// Keeps the single-window app recoverable after its last window closes.
+///
+/// SwiftUI leaves a closed `WindowGroup` scene without a visible window, so
+/// clicking the Dock icon can otherwise activate an app that has nowhere to
+/// present its content. Quitting after the final window closes gives the next
+/// launch a clean SwiftUI scene while preserving all SwiftData state.
+final class StudyFlowAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+}
+
 @main
 struct StudyFlowApp: App {
+    @NSApplicationDelegateAdaptor(StudyFlowAppDelegate.self) private var appDelegate
+
     let container: ModelContainer
     let exporter = MacDataExporter()
     let cloudFolderProvider = MacCloudFolderProvider()

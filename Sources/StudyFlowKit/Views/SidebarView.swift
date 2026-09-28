@@ -91,11 +91,7 @@ struct SidebarView: View {
             .keyboardShortcut("n", modifiers: [.command])
             .padding(8)
         }
-        .studyFlowGlassSurface(cornerRadius: 18, prominent: true)
-        .padding(.top, 7)
-        .padding(.bottom, 7)
-        .padding(.leading, 7)
-        .padding(.trailing, 3)
+        .background(.ultraThinMaterial)
         .alert(
             "删除“\(subjectPendingDelete?.name ?? "")”？",
             isPresented: Binding(
