@@ -23,6 +23,7 @@ import androidx.compose.material.icons.outlined.BackupTable
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.Download
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
@@ -188,6 +189,19 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
                         )
                     }
                 ) { Text("选择位置") }
+            }
+        }
+
+        SettingsCard(
+            icon = Icons.Outlined.Info,
+            title = "关于"
+        ) {
+            SettingRow(title = "作者") {
+                Text(
+                    "HyperPlus",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
 
