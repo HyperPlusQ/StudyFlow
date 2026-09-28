@@ -1,15 +1,36 @@
-# StudyFlow — macOS 原生学习与作业管理应用
+# StudyFlow — macOS / Android 学习与作业管理应用
 
-StudyFlow 是一款使用 **SwiftUI + SwiftData** 构建的 macOS 原生生产力应用，面向学生与需要同时管理课程、作业、截止日期和学习时段的用户。应用采用 macOS 标准的侧边栏 + 列表 + Inspector 详情布局，整体交互、控件、快捷键、菜单与视觉均遵循 Apple Human Interface Guidelines。
+StudyFlow 是一款面向学生与需要管理课程、作业、截止日期和学习时段用户的跨平台生产力应用。两个平台按独立分支开发：
+
+- **macOS** 使用 SwiftUI + SwiftData，采用侧边栏、列表与 Inspector 详情布局，并遵循 Apple Human Interface Guidelines；
+- **Android** 使用 Jetpack Compose + Room/SQLite，遵循 Material 3 Expressive，并针对手机、折叠屏和平板提供响应式布局。
+
+当前版本：**1.3.1**。macOS 与 Android 功能设计保持一致，但平台实现、界面组件和发布流程分别维护。
 
 ---
 
-## 下载预构建应用
+## 下载最新版本
 
-- [StudyFlow-macOS.zip](Releases/StudyFlow-macOS.zip) — Apple Silicon（arm64），macOS 14+
-- 解压后直接运行 `StudyFlow.app`；也可下载源码后执行构建脚本。
+当前版本：**1.3.1**
 
-## 快速开始
+- [macOS 1.3.1](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.3.1-macos) — Apple Silicon（arm64），macOS 14+
+- [Android 1.3.1](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.3.1-android) — APK，Android 8.0+
+- 仓库内镜像：[StudyFlow-macOS.zip](Releases/StudyFlow-macOS.zip)
+
+macOS 包解压后直接运行 `StudyFlow.app`；Android 包可下载 APK 后安装。
+
+---
+
+## 平台分支
+
+- `macos`（默认分支）：macOS SwiftUI 原生实现；
+- `android`：独立的 orphan 分支，Android Jetpack Compose 实现；
+- 两套工程分别维护，不共享平台 UI，但共享 StudyFlow 的产品功能设计；
+- Android 版本仅提供 JSON 导出，不包含 iCloud 相关功能。
+
+---
+
+## macOS 快速开始
 
 ### 1. 构建并打开应用
 
@@ -48,7 +69,7 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 
 ---
 
-## 功能总览
+## macOS 功能总览
 
 ### 科目管理
 
@@ -137,7 +158,8 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 - 网络不可用、API 受限或仓库暂无版本时显示可恢复的错误状态；
 - 将全部数据导出为带 ISO-8601 日期的格式化 JSON；
 - 一键预选 iCloud 云盘目录，通过 macOS 系统保存面板完成云盘备份；
-- JSON 中包含科目、作业、子任务、时间块和提交方式历史。
+- JSON 中包含科目、作业、子任务、时间块和提交方式历史；
+- “关于”中显示当前版本与作者：HyperPlus。
 
 ### iCloud Drive 自动同步
 
@@ -175,7 +197,23 @@ iCloud 修改时间 > 本地修改时间  → 导入 iCloud JSON 并覆盖本地
 
 ---
 
-## 项目架构
+## Android 功能概览
+
+Android 分支位于独立的 `android` 分支，主要特性包括：
+
+- Jetpack Compose + Material 3 Expressive 界面，Room/SQLite 本地持久化；
+- 深色模式适配与深色模式文字颜色优化；
+- 科目层级、作业 CRUD、截止日期、提交方式与子任务 Checklist；
+- 全局搜索、组合筛选、智能排序、时间块与数据仪表盘；
+- 本地提醒、系统日历同步、GitHub 更新检查；
+- 仅支持 JSON 导出，不包含 iCloud；
+- 手机竖屏使用常规底栏；横屏、折叠屏和平板使用右侧悬浮侧边栏与操作按钮；
+- 大圆角 pill 悬浮底栏、高斯模糊、自适应图标与双层图标；
+- 设置中提供“关于”，作者：HyperPlus。
+
+---
+
+## macOS 项目架构
 
 ```text
 StudyFlow/
@@ -239,7 +277,7 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 
 ---
 
-## 权限说明
+## macOS 权限说明
 
 `Resources/Info.plist` 与 `Resources/StudyFlow.entitlements` 已包含：
 
@@ -264,7 +302,7 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 
 ---
 
-## 设计与交互
+## macOS 设计与交互
 
 - 原生 `NavigationSplitView` 侧边栏结构；
 - 原生 Inspector 详情面板；
@@ -278,16 +316,23 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 
 ## 质量校验
 
-项目已执行：
+### macOS
 
 - Swift 6 全量类型检查；
 - 优化编译与完整应用包构建；
 - `codesign --verify --deep --strict`；
 - `plutil -lint` 属性列表校验；
-- SwiftData 测试数据库初始化检查。
+- SwiftData 测试数据库初始化检查；
+- 1.3.1 构建包、版本号与 ZIP 完整性验证通过。
+
+### Android
+
+- `assembleRelease`、单元测试与 Lint Release 构建通过；
+- v2/v3 APK 签名校验通过；
+- 真机深色模式与设置“关于”界面验证通过。
 
 ---
 
-## 许可与交付
+## 许可
 
-本项目源代码、应用包、图标与说明文档均位于 `StudyFlow` 目录中，可自由继续迭代。
+本项目采用 [GNU General Public License v3.0](LICENSE) 开源发布。
