@@ -64,7 +64,7 @@ struct SidebarView: View {
                     Text("科目")
                     Spacer()
                     Button { onNewSubject(nil) } label: {
-                        Image(systemName: "plus")
+                        SafeSystemImage(systemName: "plus", fallback: "circle")
                     }
                     .buttonStyle(.borderless)
                     .platformHelp("新建科目")
@@ -74,20 +74,28 @@ struct SidebarView: View {
 
     var body: some View {
         sidebarList
+        .scrollContentBackground(.hidden)
         .listStyle(.sidebar)
         .navigationTitle("StudyFlow")
         .platformNavigationSubtitle("学习与作业")
         .safeAreaInset(edge: .bottom) {
             Button(action: onNewAssignment) {
-                Label("新建作业", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 7) {
+                    SafeSystemImage(systemName: "plus", fallback: "circle")
+                    Text("新建作业")
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
             .keyboardShortcut("n", modifiers: [.command])
-            .padding(10)
-            .background(.bar)
+            .padding(8)
         }
+        .studyFlowGlassSurface(cornerRadius: 18, prominent: true)
+        .padding(.top, 7)
+        .padding(.bottom, 7)
+        .padding(.leading, 7)
+        .padding(.trailing, 3)
         .alert(
             "删除“\(subjectPendingDelete?.name ?? "")”？",
             isPresented: Binding(
@@ -152,9 +160,12 @@ struct SidebarView: View {
 
     private func subjectLabel(_ subject: Subject, count: Int, level: Int) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: subject.symbol)
-                .foregroundStyle(Color(hex: subject.colorHex))
-                .frame(width: 16)
+            SafeSystemImage(
+                systemName: subject.symbol,
+                fallback: "book.closed"
+            )
+            .foregroundStyle(Color(hex: subject.colorHex))
+            .frame(width: 16)
             Text(subject.name)
                 .lineLimit(1)
             Spacer(minLength: 6)
@@ -182,8 +193,10 @@ struct SidebarView: View {
         Button {
             selection = SidebarSelection(scope: scope)
         } label: {
-            HStack {
-                Label(scope.title, systemImage: scope.symbol)
+            HStack(spacing: 7) {
+                SafeSystemImage(systemName: scope.symbol, fallback: "circle")
+                    .frame(width: 16)
+                Text(scope.title)
                 Spacer()
                 if let count, count > 0 {
                     Text("\(count)").font(.caption).foregroundStyle(.secondary).monospacedDigit()

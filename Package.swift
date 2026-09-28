@@ -19,7 +19,8 @@ let package = Package(
         .executableTarget(
             name: "StudyFlowMacOS",
             dependencies: ["StudyFlowKit"],
-            path: "Sources/StudyFlowMacOS"
+            path: "Sources/StudyFlowMacOS",
+            resources: [.process("Resources")]
         ),
         .testTarget(
             name: "StudyFlowKitTests",

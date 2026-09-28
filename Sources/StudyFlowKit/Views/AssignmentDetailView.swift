@@ -44,7 +44,7 @@ struct AssignmentDetailView: View {
             }
             .padding(22)
         }
-        .background(Color.studyFlowControlBackground)
+        .background(.thinMaterial)
         .alert("同步日历", isPresented: Binding(
             get: { notice != nil },
             set: { if !$0 { notice = nil } }

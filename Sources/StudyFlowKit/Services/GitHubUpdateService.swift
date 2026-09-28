@@ -39,8 +39,12 @@ enum GitHubUpdateService {
         string: "https://api.github.com/repos/HyperPlusQ/StudyFlow/tags?per_page=30"
     )!
 
+    /// Matches Resources/Info.plist and keeps Xcode's direct SwiftPM runs
+    /// reporting the correct version when no application bundle exists.
+    static let bundledVersion = "1.4.0"
+
     static var currentVersion: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? bundledVersion
     }
 
     static var projectURL: URL {

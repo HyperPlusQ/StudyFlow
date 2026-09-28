@@ -47,6 +47,11 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
+RESOURCE_BUNDLE="$(find "$ROOT/.build/out/Products/Release" -maxdepth 1 -type d -name 'StudyFlow_StudyFlowMacOS.bundle' -print -quit)"
+if [[ -n "$RESOURCE_BUNDLE" && -d "$RESOURCE_BUNDLE" ]]; then
+    cp -R "$RESOURCE_BUNDLE" "$APP/Contents/Resources/"
+fi
+
 CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 codesign \
     --force \

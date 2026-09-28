@@ -74,8 +74,9 @@ struct ContentView: View {
                     )
                 }
             }
-            .background(Color.studyFlowWindowBackground)
         }
+        .background { StudyFlowBackdrop().ignoresSafeArea() }
+        .platformTransparentToolbar()
         .navigationTitle(selection.scope.title)
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)

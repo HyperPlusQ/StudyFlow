@@ -12,7 +12,7 @@ struct SubmissionMethodView: View {
                         .lineLimit(1)
                         .underline()
                 } icon: {
-                    Image(systemName: target.systemSymbol)
+                    SafeSystemImage(systemName: target.systemSymbol, fallback: "link")
                 }
                 .font(compact ? .caption : .callout)
                 .foregroundStyle(.tint)
@@ -30,7 +30,7 @@ struct SubmissionMethodView: View {
                 Text(value)
                     .lineLimit(compact ? 1 : nil)
             } icon: {
-                Image(systemName: "paperplane")
+                SafeSystemImage(systemName: "paperplane", fallback: "envelope")
             }
             .font(compact ? .caption : .callout)
             .foregroundStyle(compact ? .tertiary : .primary)

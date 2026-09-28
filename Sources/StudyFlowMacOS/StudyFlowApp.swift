@@ -17,6 +17,25 @@ struct StudyFlowApp: App {
         }
     }
 
+    private static var didApplyPackagedIcon = false
+
+    static func applyPackagedIconIfNeeded() {
+        guard !didApplyPackagedIcon else { return }
+        didApplyPackagedIcon = true
+
+        // Prefer the packaged application bundle so release builds never force
+        // the SwiftPM resource accessor before the app icon has been found.
+        if let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+           let image = NSImage(contentsOf: url) {
+            NSApplication.shared.applicationIconImage = image
+            return
+        }
+
+        guard let url = Bundle.module.url(forResource: "AppIcon", withExtension: "icns"),
+              let image = NSImage(contentsOf: url) else { return }
+        NSApplication.shared.applicationIconImage = image
+    }
+
     var body: some Scene {
         WindowGroup("StudyFlow") {
             StudyFlowRootView(
@@ -26,6 +45,7 @@ struct StudyFlowApp: App {
             .modelContainer(container)
             .frame(minWidth: 1_000, minHeight: 680)
             .onAppear {
+                StudyFlowApp.applyPackagedIconIfNeeded()
                 NSApplication.shared.setActivationPolicy(.regular)
                 NSApp.activate(ignoringOtherApps: true)
             }
