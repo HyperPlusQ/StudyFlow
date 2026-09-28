@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 
 enum SubmissionMethodTarget: Equatable, Sendable {
@@ -38,11 +37,6 @@ enum SubmissionMethodResolver {
             return mailTarget
         }
         return urlTarget(in: value)
-    }
-
-    static func open(_ rawValue: String) {
-        guard let target = target(for: rawValue) else { return }
-        NSWorkspace.shared.open(target.destination)
     }
 
     private static func emailTarget(in value: String) -> SubmissionMethodTarget? {

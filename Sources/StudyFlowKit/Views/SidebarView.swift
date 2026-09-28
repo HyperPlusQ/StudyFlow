@@ -19,8 +19,21 @@ struct SidebarView: View {
 
     private var activeAssignments: [Assignment] { assignments.filter { !$0.isCompleted } }
 
-    var body: some View {
+    @ViewBuilder
+    private var sidebarList: some View {
+        #if os(macOS)
         List(selection: $selection) {
+            sidebarContent
+        }
+        #else
+        List {
+            sidebarContent
+        }
+        #endif
+    }
+
+    @ViewBuilder
+    private var sidebarContent: some View {
             Section {
                 sidebarItem(scope: .today, count: activeAssignments.filter { item in
                     guard let due = item.dueDate else { return false }
@@ -54,13 +67,16 @@ struct SidebarView: View {
                         Image(systemName: "plus")
                     }
                     .buttonStyle(.borderless)
-                    .help("新建科目")
+                    .platformHelp("新建科目")
                 }
             }
-        }
+    }
+
+    var body: some View {
+        sidebarList
         .listStyle(.sidebar)
         .navigationTitle("StudyFlow")
-        .navigationSubtitle("学习与作业")
+        .platformNavigationSubtitle("学习与作业")
         .safeAreaInset(edge: .bottom) {
             Button(action: onNewAssignment) {
                 Label("新建作业", systemImage: "plus")

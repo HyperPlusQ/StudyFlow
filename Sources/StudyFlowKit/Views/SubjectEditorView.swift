@@ -83,7 +83,7 @@ struct SubjectEditorView: View {
                                         Image(systemName: "trash")
                                     }
                                     .buttonStyle(.borderless)
-                                    .help("从本科目的历史记录中删除")
+                                    .platformHelp("从本科目的历史记录中删除")
                                 }
                             }
                         }

@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import SwiftData
 import UniformTypeIdentifiers
@@ -8,10 +7,10 @@ enum DataExportService {
         case anywhere
         case iCloudDrive
 
-        var title: String {
+        var exportDestination: StudyFlowExportDestination {
             switch self {
-            case .anywhere: "导出 StudyFlow 数据"
-            case .iCloudDrive: "导出 StudyFlow 数据到 iCloud 云盘"
+            case .anywhere: .anywhere
+            case .iCloudDrive: .iCloudDrive
             }
         }
     }
@@ -77,24 +76,6 @@ enum DataExportService {
         let subjectId: UUID
         let value: String
         let lastUsedAt: Date
-    }
-
-    @MainActor
-    static func export(
-        subjects: [Subject],
-        assignments: [Assignment],
-        timeBlocks: [TimeBlock],
-        submissionHistory: [SubmissionHistoryEntry],
-        destination: Destination
-    ) throws {
-        guard let url = chooseDestination(for: destination) else { return }
-        let data = try encodedDocument(
-            subjects: subjects,
-            assignments: assignments,
-            timeBlocks: timeBlocks,
-            submissionHistory: submissionHistory
-        )
-        try write(data, to: url)
     }
 
     @MainActor
@@ -360,25 +341,8 @@ enum DataExportService {
         }
     }
 
-    @MainActor
-    private static func chooseDestination(for destination: Destination) -> URL? {
-        let panel = NSSavePanel()
-        panel.title = destination.title
-        panel.message = destination == .iCloudDrive
-            ? "确认文件名为 StudyFlow 备份，然后保存到 iCloud 云盘。"
-            : "可选择本机文件夹或 iCloud 云盘作为备份位置。"
-        panel.prompt = "导出"
-        panel.allowedContentTypes = [.json]
-        panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "StudyFlow-Backup-\(Self.dateStamp()).json"
-
-        if destination == .iCloudDrive {
-            panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-                .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
-        }
-
-        guard panel.runModal() == .OK else { return nil }
-        return panel.url
+    static func suggestedFileName() -> String {
+        "StudyFlow-Backup-\(dateStamp()).json"
     }
 
     private static func dateStamp() -> String {

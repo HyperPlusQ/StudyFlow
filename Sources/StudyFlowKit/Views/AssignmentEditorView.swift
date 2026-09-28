@@ -158,7 +158,7 @@ struct AssignmentEditorView: View {
                             }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
-                            .help("选择本科目曾经使用过的提交方式")
+                            .platformHelp("选择本科目曾经使用过的提交方式")
                         }
                     }
 
@@ -177,7 +177,7 @@ struct AssignmentEditorView: View {
                     ForEach($subtasks) { $subtask in
                         HStack {
                             Toggle("", isOn: $subtask.isCompleted)
-                                .toggleStyle(.checkbox)
+                                .platformCheckboxStyle()
                                 .labelsHidden()
                             TextField("子任务", text: $subtask.title, prompt: Text("拆解成可执行的下一步"))
                                 .textFieldStyle(.plain)

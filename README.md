@@ -22,7 +22,7 @@ open dist/StudyFlow.app
 
 构建脚本会：
 
-1. 使用当前 Mac 架构编译 Swift 源码；
+1. 使用 SwiftPM 按当前 Mac 架构编译 `StudyFlow` 可执行目标；
 2. 创建标准 `.app` 应用包；
 3. 写入 `Info.plist` 与应用图标；
 4. 使用 App Sandbox 与日历权限描述进行 ad hoc 签名；
@@ -178,41 +178,50 @@ iCloud 修改时间 > 本地修改时间  → 导入 iCloud JSON 并覆盖本地
 
 ```text
 StudyFlow/
-├── Package.swift
-├── Sources/StudyFlow/
-│   ├── StudyFlowApp.swift              # 应用入口、Scene、全局快捷键
-│   ├── Models/
-│   │   ├── Models.swift                # SwiftData 数据模型
-│   │   └── FilterState.swift           # 列表范围与组合筛选状态
-│   ├── Services/
-│   │   ├── SmartScoring.swift          # 截止紧迫性智能排序
-│   │   ├── NotificationManager.swift   # 本地通知授权与调度
-│   │   ├── CalendarService.swift       # EventKit 同步
-│   │   ├── GitHubUpdateService.swift   # GitHub 更新检查
-│   │   ├── DataExportService.swift     # JSON 导出与完整快照恢复
-│   │   ├── ICloudSyncCoordinator.swift # iCloud 启动/定时同步协调
-│   │   ├── PersistentStore.swift       # 保存并刷新本地同步镜像
-│   │   ├── SubmissionMethod.swift      # 网址与邮件目标识别
-│   │   ├── SubmissionHistoryStore.swift# 科目提交方式历史
-│   │   └── StudyOperations.swift       # 科目层级与安全删除操作
-│   ├── Views/
-│   │   ├── ContentView.swift           # 主窗口与 Inspector 布局
-│   │   ├── SidebarView.swift           # 科目树与视图范围
-│   │   ├── AssignmentListView.swift    # 搜索、筛选、排序和列表
-│   │   ├── AssignmentDetailView.swift  # 作业详情、Checklist、时间块
-│   │   ├── AssignmentEditorView.swift  # 作业编辑表单
-│   │   ├── SubjectEditorView.swift     # 科目编辑
-│   │   ├── TimeBlockEditorView.swift   # 时间块编辑
-│   │   └── DashboardView.swift         # 数据仪表盘
-│   └── Components/                     # 选择器、状态卡片、提交方式与视觉组件
+├── Package.swift                       # 同时声明 macOS 14 与 iOS 17
+├── Sources/
+│   ├── StudyFlowKit/                   # 跨 Apple 平台共享目标
+│   │   ├── StudyFlowKit.swift           # 公共入口与平台注入点
+│   │   ├── Platform/
+│   │   │   ├── StudyFlowPlatform.swift  # 导出、云盘选择器协议
+│   │   │   └── PlatformAppearance.swift # macOS/iOS 控件与颜色适配
+│   │   ├── Models/                      # SwiftData 数据模型与筛选状态
+│   │   ├── Services/                    # 智能排序、同步、通知、日历等
+│   │   ├── Views/                       # 共享 SwiftUI 界面
+│   │   └── Components/                  # 选择器、状态卡片与视觉组件
+│   └── StudyFlowMacOS/                  # macOS 专属 shell
+│       ├── StudyFlowApp.swift            # Scene、菜单、全局快捷键
+│       └── Platform/                    # NSSavePanel/NSOpenPanel 适配器
+├── Tests/StudyFlowKitTests/             # 共享目标单元测试
 ├── Resources/
 │   ├── Info.plist
 │   ├── StudyFlow.entitlements
 │   └── AppIcon.icns
 └── Scripts/
-    ├── build-app.sh                    # 一键构建完整 .app
+    ├── build-app.sh                    # SwiftPM 构建并封装完整 .app
     └── generate_app_icon.py            # 应用图标生成脚本
 ```
+
+### 跨平台架构
+
+`StudyFlowKit` 是未来 iOS/iPadOS 移植时可直接复用的共享目标：
+
+- 数据模型、业务服务、智能排序、iCloud 同步协调与全部共享 SwiftUI 视图均位于该 target；
+- 平台相关的文件面板通过 `StudyFlowDataExporter` 与 `StudyFlowCloudFolderProvider` 协议注入；
+- macOS shell 使用 `NSSavePanel`/`NSOpenPanel` 实现这些协议，共享代码不直接依赖 AppKit；
+- SwiftUI 的 `.help`、checkbox、链接按钮、导航副标题与背景色差异由 `PlatformAppearance.swift` 集中处理；
+- `StudyFlowMacOS` 只保留 App Scene、菜单命令、macOS 签名所需的入口和平台适配器。
+
+SwiftPM 同时声明 `macOS 14` 与 `iOS 17`，因此可以先验证共享库的 iOS 编译：
+
+```bash
+swift build \
+  --disable-sandbox \
+  --triple arm64-apple-ios17.0-simulator \
+  --product StudyFlowKit
+```
+
+未来创建 iOS App target 时，只需提供 SwiftUI 入口，并向 `StudyFlowRootView`/`StudyFlowSettingsView` 注入 iOS 版导出与文件选择器实现。
 
 ### 持久化
 
@@ -280,7 +289,9 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 项目已执行：
 
 - Swift 6 全量类型检查；
-- 优化编译与完整应用包构建；
+- `StudyFlowKit` 单元测试（智能排序与提交方式识别）；
+- macOS release 编译与完整应用包构建；
+- iOS 17 simulator 下的 `StudyFlowKit` 编译检查；
 - `codesign --verify --deep --strict`；
 - `plutil -lint` 属性列表校验；
 - SwiftData 测试数据库初始化检查。

@@ -75,30 +75,7 @@ struct AssignmentListView: View {
             if visibleAssignments.isEmpty {
                 emptyState
             } else {
-                List(selection: $selectedAssignmentId) {
-                    Section {
-                        ForEach(Array(visibleAssignments.enumerated()), id: \.element.id) { index, item in
-                            let task: Assignment = item
-                            let taskSubject = task.subjectId.flatMap { subjectMap[$0] }
-                            let rankValue: Int? = scope.scope == .completed ? nil : index + 1
-                            AssignmentRow(
-                                assignment: task,
-                                subject: taskSubject,
-                                rank: rankValue,
-                                onToggle: { toggleComplete(task) },
-                                onEdit: { editingAssignment = task },
-                                onSchedule: { schedulingAssignment = task }
-                            )
-                            .tag(task.id)
-                        }
-                    } header: {
-                        Label(
-                            scope.scope == .completed ? "最近完成" : "按紧迫度与自定义权重排序",
-                            systemImage: scope.scope == .completed ? "checkmark.circle" : "sparkles"
-                        )
-                    }
-                }
-                .listStyle(.inset)
+                assignmentList
             }
         }
         .navigationTitle(scope.subjectId.map { subjectMap[$0]?.name ?? scope.scope.title } ?? scope.scope.title)
@@ -137,13 +114,54 @@ struct AssignmentListView: View {
         .sheet(item: $schedulingAssignment) { TimeBlockEditorView(subjects: subjects, assignment: $0) }
     }
 
+    @ViewBuilder
+    private var assignmentList: some View {
+        #if os(macOS)
+        List(selection: $selectedAssignmentId) {
+            assignmentListContent
+        }
+        .listStyle(.inset)
+        #else
+        List {
+            assignmentListContent
+        }
+        .listStyle(.inset)
+        #endif
+    }
+
+    @ViewBuilder
+    private var assignmentListContent: some View {
+                    Section {
+                        ForEach(Array(visibleAssignments.enumerated()), id: \.element.id) { index, item in
+                            let task: Assignment = item
+                            let taskSubject = task.subjectId.flatMap { subjectMap[$0] }
+                            let rankValue: Int? = scope.scope == .completed ? nil : index + 1
+                            AssignmentRow(
+                                assignment: task,
+                                subject: taskSubject,
+                                rank: rankValue,
+                                onToggle: { toggleComplete(task) },
+                                onEdit: { editingAssignment = task },
+                                onSchedule: { schedulingAssignment = task }
+                            )
+                            .tag(task.id)
+                            .onTapGesture { selectedAssignmentId = task.id }
+                        }
+                    } header: {
+                        Label(
+                            scope.scope == .completed ? "最近完成" : "按紧迫度与自定义权重排序",
+                            systemImage: scope.scope == .completed ? "checkmark.circle" : "sparkles"
+                        )
+                    }
+    }
+
     private var summaryBar: some View {
         HStack(spacing: 10) {
             Label("\(visibleAssignments.count) 项", systemImage: "list.bullet")
                 .foregroundStyle(.secondary)
             if !filter.isDefault {
                 Text("已应用筛选").font(.caption).foregroundStyle(Color.accentColor)
-                Button("清除") { filter.reset() }.buttonStyle(.link)
+                Button("清除") { filter.reset() }.platformLinkButtonStyle()
             }
             Spacer()
             if scope.scope != .completed && !visibleAssignments.isEmpty {
@@ -200,7 +218,7 @@ struct AssignmentRow: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.plain)
-            .help(assignment.isCompleted ? "恢复进行中" : "标记为已完成")
+            .platformHelp(assignment.isCompleted ? "恢复进行中" : "标记为已完成")
 
             if let rank, rank <= 5 {
                 Text("\(rank)")

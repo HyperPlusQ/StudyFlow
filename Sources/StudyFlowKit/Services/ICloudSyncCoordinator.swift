@@ -1,4 +1,3 @@
-import AppKit
 import Foundation
 import Observation
 import SwiftData
@@ -33,6 +32,7 @@ final class ICloudSyncCoordinator {
 
     @ObservationIgnored private let defaults = UserDefaults.standard
     @ObservationIgnored private var lastScheduledSyncDay: String?
+    @ObservationIgnored private var folderProvider: (any StudyFlowCloudFolderProvider)?
 
     private init() {
         let storedEnabled = defaults.bool(forKey: Key.enabled)
@@ -57,6 +57,10 @@ final class ICloudSyncCoordinator {
         String(format: "每天 %02d:%02d", syncHour, syncMinute)
     }
 
+    func configure(folderProvider: (any StudyFlowCloudFolderProvider)?) {
+        self.folderProvider = folderProvider
+    }
+
     @discardableResult
     func setEnabled(_ enabled: Bool, context: ModelContext) -> Bool {
         if enabled {
@@ -78,15 +82,19 @@ final class ICloudSyncCoordinator {
 
     @discardableResult
     func chooseFolder(context: ModelContext? = nil) -> Bool {
-        guard let folder = chooseFolderInPanel() else { return false }
+        guard let folderProvider else {
+            lastMessage = "当前平台尚未配置 iCloud 文件夹选择器。"
+            defaults.set(lastMessage, forKey: Key.lastMessage)
+            return false
+        }
         do {
-            let bookmark = try folder.bookmarkData(
-                options: [.withSecurityScope],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
+            let bookmark = try folderProvider.chooseFolder(
+                currentBookmark: folderBookmark
             )
             defaults.set(bookmark, forKey: Key.bookmark)
-            folderName = folder.lastPathComponent
+            folderName = try? folderProvider
+                .resolveFolder(bookmark: bookmark)
+                .lastPathComponent
             defaults.set(folderName, forKey: Key.folderName)
             if let context {
                 synchronize(context: context)
@@ -290,65 +298,12 @@ final class ICloudSyncCoordinator {
     }
 
     private func resolveFolder() throws -> URL {
+        guard let folderProvider else {
+            throw CocoaError(.fileNoSuchFile)
+        }
         guard let bookmark = folderBookmark else {
             throw CocoaError(.fileNoSuchFile)
         }
-
-        var isStale = false
-        let folder = try URL(
-            resolvingBookmarkData: bookmark,
-            options: [.withSecurityScope, .withoutUI],
-            relativeTo: nil,
-            bookmarkDataIsStale: &isStale
-        )
-
-        if isStale {
-            let refreshed = try folder.bookmarkData(
-                options: [.withSecurityScope],
-                includingResourceValuesForKeys: nil,
-                relativeTo: nil
-            )
-            defaults.set(refreshed, forKey: Key.bookmark)
-        }
-        return folder
-    }
-
-    private func chooseFolderInPanel() -> URL? {
-        let panel = NSOpenPanel()
-        panel.title = "选择 iCloud 同步文件夹"
-        panel.message = "请选择 iCloud 云盘中的文件夹；StudyFlow 会在此处保存 \(Self.fileName)。"
-        panel.prompt = "选择文件夹"
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.canCreateDirectories = true
-        panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/Mobile Documents/com~apple~CloudDocs", isDirectory: true)
-
-        if let bookmark = folderBookmark {
-            var isStale = false
-            if let current = try? URL(
-                resolvingBookmarkData: bookmark,
-                options: [.withSecurityScope, .withoutUI],
-                relativeTo: nil,
-                bookmarkDataIsStale: &isStale
-            ) {
-                panel.directoryURL = current
-            }
-        }
-
-        guard panel.runModal() == .OK, let url = panel.url else { return nil }
-
-        let standardizedPath = url.standardizedFileURL.path
-        guard standardizedPath.contains("/Library/Mobile Documents/com~apple~CloudDocs") else {
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "请选择 iCloud 云盘中的文件夹"
-            alert.informativeText = "StudyFlow 的自动同步需要把 \(Self.fileName) 保存在 iCloud 云盘，才能在设备之间同步。"
-            alert.addButton(withTitle: "好")
-            alert.runModal()
-            return nil
-        }
-        return url
+        return try folderProvider.resolveFolder(bookmark: bookmark)
     }
 }

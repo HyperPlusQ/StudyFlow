@@ -69,7 +69,7 @@ struct DashboardView: View {
             }
             .padding(24)
         }
-        .background(Color(nsColor: .windowBackgroundColor))
+        .background(Color.studyFlowWindowBackground)
         .navigationTitle("仪表盘")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {

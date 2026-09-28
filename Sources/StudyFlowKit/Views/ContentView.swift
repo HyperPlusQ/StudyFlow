@@ -9,6 +9,9 @@ extension Notification.Name {
 }
 
 struct ContentView: View {
+    let exporter: (any StudyFlowDataExporter)?
+    let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
+
     @Environment(\.modelContext) private var context
     @Query(sort: \Subject.sortOrder) private var subjects: [Subject]
     @Query(sort: \Assignment.updatedAt, order: .reverse) private var assignments: [Assignment]
@@ -23,6 +26,14 @@ struct ContentView: View {
     @State private var editingSubject: Subject?
     @State private var showNewTimeBlock = false
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
+
+    init(
+        exporter: (any StudyFlowDataExporter)? = nil,
+        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
+    ) {
+        self.exporter = exporter
+        self.cloudFolderProvider = cloudFolderProvider
+    }
 
     var body: some View {
         NavigationSplitView {
@@ -63,7 +74,7 @@ struct ContentView: View {
                     )
                 }
             }
-            .background(Color(nsColor: .windowBackgroundColor))
+            .background(Color.studyFlowWindowBackground)
         }
         .navigationTitle(selection.scope.title)
         .task {
@@ -102,18 +113,23 @@ struct ContentView: View {
 }
 
 struct SettingsView: View {
-    @Environment(\.modelContext) private var context
+    let exporter: (any StudyFlowDataExporter)?
+    let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
 
-    @Query private var subjects: [Subject]
-    @Query private var assignments: [Assignment]
-    @Query private var timeBlocks: [TimeBlock]
-    @Query(sort: \SubmissionHistoryEntry.lastUsedAt, order: .reverse)
-    private var submissionHistory: [SubmissionHistoryEntry]
+    @Environment(\.modelContext) private var context
 
     @State private var notice: String?
     @State private var updateState: UpdateCheckState = .idle
     @State private var exportNotice: String?
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
+
+    init(
+        exporter: (any StudyFlowDataExporter)? = nil,
+        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
+    ) {
+        self.exporter = exporter
+        self.cloudFolderProvider = cloudFolderProvider
+    }
 
     var body: some View {
         Form {
@@ -243,14 +259,14 @@ struct SettingsView: View {
                     } label: {
                         Label("更改同步文件夹…", systemImage: "folder")
                     }
-                    .disabled(!syncCoordinator.isEnabled)
+                    .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
 
                     Button {
                         syncCoordinator.synchronize(context: context)
                     } label: {
                         Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
                     }
-                    .disabled(!syncCoordinator.isEnabled)
+                    .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
 
                     Spacer()
                 }
@@ -270,12 +286,20 @@ struct SettingsView: View {
                     } label: {
                         Label("导出 JSON…", systemImage: "square.and.arrow.up")
                     }
+                    .disabled(exporter == nil)
 
                     Button {
                         exportData(to: .iCloudDrive)
                     } label: {
                         Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
                     }
+                    .disabled(exporter == nil)
+                }
+
+                if exporter == nil {
+                    Text("当前平台尚未配置 JSON 导出器。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
 
                 Text("导出包含科目、作业、子任务、时间块和提交方式历史，可保存到本机或在保存对话框中选择 iCloud 云盘。")
@@ -332,15 +356,25 @@ struct SettingsView: View {
 
     @MainActor
     private func exportData(to destination: DataExportService.Destination) {
+        guard let exporter else {
+            exportNotice = "当前平台尚未配置 JSON 导出器。"
+            return
+        }
+
         do {
-            try DataExportService.export(
-                subjects: subjects,
-                assignments: assignments,
-                timeBlocks: timeBlocks,
-                submissionHistory: submissionHistory,
-                destination: destination
+            let data = try DataExportService.currentData(context: context)
+            let didSave = try exporter.export(
+                data: data,
+                suggestedFileName: DataExportService.suggestedFileName(),
+                destination: destination.exportDestination
             )
-            exportNotice = "导出成功。文件已写入所选位置。"
+            if didSave {
+                exportNotice = "导出成功。文件已写入所选位置。"
+            } else {
+                exportNotice = "已取消导出。"
+            }
+        } catch is CocoaError {
+            exportNotice = "已取消导出。"
         } catch {
             exportNotice = "导出失败：\(error.localizedDescription)"
         }
