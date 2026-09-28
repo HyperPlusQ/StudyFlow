@@ -4,6 +4,11 @@ StudyFlow 是一款使用 **SwiftUI + SwiftData** 构建的 macOS 原生生产�
 
 ---
 
+## 下载预构建应用
+
+- [StudyFlow-macOS.zip](Releases/StudyFlow-macOS.zip) — Apple Silicon（arm64），macOS 14+
+- 解压后直接运行 `StudyFlow.app`；也可下载源码后执行构建脚本。
+
 ## 快速开始
 
 ### 1. 构建并打开应用
