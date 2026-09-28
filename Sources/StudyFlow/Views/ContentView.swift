@@ -291,6 +291,12 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("关于") {
+                LabeledContent("作者") {
+                    Text("HyperPlus")
+                }
+            }
         }
         .formStyle(.grouped)
         .frame(width: 560, height: 760)
