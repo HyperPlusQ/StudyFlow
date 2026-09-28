@@ -44,7 +44,7 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 3. 选择 `StudyFlow` scheme；
 4. 按 `⌘R` 运行，或按 `⌘B` 编译。
 
-日常交付构建建议优先使用 `Scripts/build-app.sh`，因为它会生成带 `Info.plist`、应用图标、Sandbox 与日历 entitlements 的完整应用包。
+日常交付构建建议优先使用 `Scripts/build-app.sh`，因为它会生成带 `Info.plist`、应用图标、Sandbox、网络与文件访问 entitlements 的完整应用包。
 
 ---
 
@@ -71,7 +71,11 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 - 支持将大型作业拆分为可勾选的 Checklist 子任务；
 - 自动计算子任务完成进度；
 - 完成作业后自动移入“已完成”，再次勾选可恢复为进行中；
-- 完成作业时自动收起其全部子任务并取消本地提醒。
+- 完成作业时自动收起其全部子任务并取消本地提醒；
+- 网址提交方式可在列表与详情中点击，并交给系统默认浏览器打开；
+- 邮箱提交方式可直接点击，交给系统默认邮件应用起草新邮件；
+- 按科目记忆曾经填写的提交方式，编辑作业时可从建议菜单快速选择；
+- 科目编辑窗口支持逐条手动删除提交历史。
 
 ### 搜索、筛选与智能排序
 
@@ -125,6 +129,16 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 - 按“截止日期前 N 小时”生成本地通知；
 - 作业完成、截止时间或提醒设置变化时自动取消并重建通知。
 
+### 软件更新、iCloud 与导出
+
+设置窗口提供：
+
+- 从 GitHub 的 Release/Tag 获取最新版本，比较当前版本并提供查看更新的入口；
+- 网络不可用、API 受限或仓库暂无版本时显示可恢复的错误状态；
+- 将全部数据导出为带 ISO-8601 日期的格式化 JSON；
+- 一键预选 iCloud 云盘目录，通过 macOS 系统保存面板完成云盘备份；
+- JSON 中包含科目、作业、子任务、时间块和提交方式历史。
+
 ### 系统日历同步
 
 通过 `EventKit` 支持：
@@ -152,6 +166,10 @@ StudyFlow/
 │   │   ├── SmartScoring.swift          # 截止紧迫性智能排序
 │   │   ├── NotificationManager.swift   # 本地通知授权与调度
 │   │   ├── CalendarService.swift       # EventKit 同步
+│   │   ├── GitHubUpdateService.swift   # GitHub 更新检查
+│   │   ├── DataExportService.swift     # JSON / iCloud 云盘导出
+│   │   ├── SubmissionMethod.swift      # 网址与邮件目标识别
+│   │   ├── SubmissionHistoryStore.swift# 科目提交方式历史
 │   │   └── StudyOperations.swift       # 科目层级与安全删除操作
 │   ├── Views/
 │   │   ├── ContentView.swift           # 主窗口与 Inspector 布局
@@ -162,7 +180,7 @@ StudyFlow/
 │   │   ├── SubjectEditorView.swift     # 科目编辑
 │   │   ├── TimeBlockEditorView.swift   # 时间块编辑
 │   │   └── DashboardView.swift         # 数据仪表盘
-│   └── Components/                     # 选择器、状态卡片与视觉组件
+│   └── Components/                     # 选择器、状态卡片、提交方式与视觉组件
 ├── Resources/
 │   ├── Info.plist
 │   ├── StudyFlow.entitlements
@@ -179,7 +197,8 @@ StudyFlow/
 - `Subject`：科目树；
 - `Assignment`：作业与截止元数据；
 - `Subtask`：Checklist 子任务，使用级联删除关系；
-- `TimeBlock`：工作时间块。
+- `TimeBlock`：工作时间块；
+- `SubmissionHistoryEntry`：按科目保存的提交方式历史。
 
 默认数据库位于当前应用的 macOS Sandbox 容器中。若设置了 `STUDYFLOW_STORE_PATH` 环境变量，应用会改用指定的 SQLite 文件；该选项主要用于自动化测试或便携式数据目录：
 
@@ -187,9 +206,11 @@ StudyFlow/
 STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 ```
 
-### 同步状态
+### iCloud 与同步状态
 
-当前版本聚焦本地优先与隐私安全，数据保存在 SwiftData SQLite 数据库中，**尚未启用 iCloud/CloudKit 跨设备同步**。数据模型使用稳定 UUID 关联对象，未来可以平滑接入 `ModelConfiguration(cloudKitDatabase:)` 或服务端同步层。
+应用数据默认保存在 SwiftData SQLite 数据库中。设置窗口支持把完整数据导出为 JSON，并可从保存面板直接选择 **iCloud 云盘**，形成可迁移的云盘备份。
+
+当前版本提供的是 **iCloud 云盘文件备份**，尚未启用 CloudKit 自动多设备同步；数据模型使用稳定 UUID 关联对象，未来可以接入 `ModelConfiguration(cloudKitDatabase:)` 或其他同步层。
 
 ---
 
@@ -199,6 +220,8 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 
 - `com.apple.security.app-sandbox`：macOS App Sandbox；
 - `com.apple.security.personal-information.calendars`：日历访问；
+- `com.apple.security.network.client`：从 GitHub 检查软件更新；
+- `com.apple.security.files.user-selected.read-write`：通过系统面板导出 JSON 或保存到 iCloud 云盘；
 - `NSCalendarsFullAccessUsageDescription`：macOS 14 日历权限用途说明；
 - `NSCalendarsUsageDescription`：兼容性用途说明。
 

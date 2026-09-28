@@ -24,6 +24,8 @@ struct AssignmentEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query(sort: \SubmissionHistoryEntry.lastUsedAt, order: .reverse)
+    private var submissionHistory: [SubmissionHistoryEntry]
 
     @State private var title: String
     @State private var details: String
@@ -69,6 +71,15 @@ struct AssignmentEditorView: View {
 
     private var canSave: Bool {
         !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private var submissionSuggestions: [SubmissionHistoryEntry] {
+        guard let subjectId else { return [] }
+        var seen = Set<String>()
+        return submissionHistory.filter { entry in
+            guard entry.subjectId == subjectId else { return false }
+            return seen.insert(entry.value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()).inserted
+        }
     }
 
     var body: some View {
@@ -125,7 +136,41 @@ struct AssignmentEditorView: View {
                 }
 
                 Section("提交方式") {
-                    TextField("渠道或方式", text: $submissionMethod, prompt: Text("例如：Canvas 上传 / 教学楼 B201 纸质提交"))
+                    HStack(spacing: 7) {
+                        TextField(
+                            "渠道或方式",
+                            text: $submissionMethod,
+                            prompt: Text("例如：Canvas 上传、网址、邮箱或纸质提交")
+                        )
+
+                        if !submissionSuggestions.isEmpty {
+                            Menu {
+                                ForEach(submissionSuggestions) { entry in
+                                    Button(entry.value) {
+                                        submissionMethod = entry.value
+                                    }
+                                }
+                                Divider()
+                                Text("在“编辑科目”中可删除历史记录")
+                            } label: {
+                                Image(systemName: "chevron.down.circle")
+                                    .frame(width: 22, height: 22)
+                            }
+                            .menuStyle(.borderlessButton)
+                            .fixedSize()
+                            .help("选择本科目曾经使用过的提交方式")
+                        }
+                    }
+
+                    if !submissionSuggestions.isEmpty {
+                        Text("已记住本科目使用过的 \(submissionSuggestions.count) 种提交方式；可在科目编辑窗口中手动删除。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("保存后，本科目会记住该提交方式，便于下次快速填写。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
 
                 Section {

@@ -94,7 +94,17 @@ struct ContentView: View {
 }
 
 struct SettingsView: View {
+    @Environment(\.modelContext) private var context
+
+    @Query private var subjects: [Subject]
+    @Query private var assignments: [Assignment]
+    @Query private var timeBlocks: [TimeBlock]
+    @Query(sort: \SubmissionHistoryEntry.lastUsedAt, order: .reverse)
+    private var submissionHistory: [SubmissionHistoryEntry]
+
     @State private var notice: String?
+    @State private var updateState: UpdateCheckState = .idle
+    @State private var exportNotice: String?
 
     var body: some View {
         Form {
@@ -111,25 +121,141 @@ struct SettingsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
             Section("系统日历") {
                 Text("在作业详情中可将截止时间添加到 macOS 系统日历；首次同步时会请求日历权限。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-            Section("数据") {
+
+            Section("软件更新") {
+                LabeledContent("当前版本") {
+                    Text(GitHubUpdateService.currentVersion)
+                        .monospacedDigit()
+                }
+                LabeledContent("更新状态") {
+                    Text(updateStatusText)
+                        .foregroundStyle(statusColor)
+                }
+                HStack {
+                    Button {
+                        Task { await checkForUpdates() }
+                    } label: {
+                        if case .checking = updateState {
+                            ProgressView().controlSize(.small)
+                            Text("正在检查…")
+                        } else {
+                            Label("从 GitHub 检查更新", systemImage: "arrow.clockwise.circle")
+                        }
+                    }
+                    .disabled({
+                        if case .checking = updateState { return true }
+                        return false
+                    }())
+
+                    Spacer()
+
+                    if case let .updateAvailable(_, url) = updateState {
+                        Link("查看更新", destination: url)
+                            .buttonStyle(.borderedProminent)
+                    }
+                }
+                if case .failed = updateState {
+                    Button("重新检查") {
+                        Task { await checkForUpdates() }
+                    }
+                    .buttonStyle(.borderless)
+                }
+                Link("前往 StudyFlow on GitHub", destination: GitHubUpdateService.projectURL)
+                    .font(.caption)
+                Text("更新检查读取 GitHub 的 Release 与 Tag 信息；更新页面由系统浏览器打开，并由用户完成下载安装。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section("备份与 iCloud") {
                 LabeledContent("存储方式") { Text("SwiftData 本地存储") }
-                LabeledContent("跨设备同步") { Text("当前未启用 iCloud") }
-                Text("作业、科目、子任务和时间块均保存在本机应用容器中。")
+                LabeledContent("云盘备份") { Text("iCloud 云盘 JSON 导出") }
+
+                HStack {
+                    Button {
+                        exportData(to: .anywhere)
+                    } label: {
+                        Label("导出 JSON…", systemImage: "square.and.arrow.up")
+                    }
+
+                    Button {
+                        exportData(to: .iCloudDrive)
+                    } label: {
+                        Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
+                    }
+                }
+
+                Text("导出包含科目、作业、子任务、时间块和提交方式历史，可保存到本机或在保存对话框中选择 iCloud 云盘。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
         }
         .formStyle(.grouped)
-        .frame(width: 500, height: 430)
+        .frame(width: 560, height: 650)
         .alert("设置", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("好") { notice = nil }
         } message: {
             Text(notice ?? "")
+        }
+        .alert("数据导出", isPresented: Binding(get: { exportNotice != nil }, set: { if !$0 { exportNotice = nil } })) {
+            Button("好") { exportNotice = nil }
+        } message: {
+            Text(exportNotice ?? "")
+        }
+    }
+
+    private var updateStatusText: String {
+        switch updateState {
+        case .idle:
+            "尚未检查"
+        case .checking:
+            "正在连接 GitHub…"
+        case let .upToDate(version):
+            "已是最新版本（\(version)）"
+        case let .updateAvailable(version, _):
+            "发现新版本 \(version)"
+        case let .failed(message):
+            message
+        }
+    }
+
+    private var statusColor: Color {
+        switch updateState {
+        case .idle, .checking:
+            .secondary
+        case .upToDate:
+            .green
+        case .updateAvailable:
+            .orange
+        case .failed:
+            .red
+        }
+    }
+
+    private func checkForUpdates() async {
+        updateState = .checking
+        updateState = await GitHubUpdateService.checkForUpdates()
+    }
+
+    @MainActor
+    private func exportData(to destination: DataExportService.Destination) {
+        do {
+            try DataExportService.export(
+                subjects: subjects,
+                assignments: assignments,
+                timeBlocks: timeBlocks,
+                submissionHistory: submissionHistory,
+                destination: destination
+            )
+            exportNotice = "导出成功。文件已写入所选位置。"
+        } catch {
+            exportNotice = "导出失败：\(error.localizedDescription)"
         }
     }
 }

@@ -223,10 +223,7 @@ struct AssignmentRow: View {
                 }
                 HStack(spacing: 10) {
                     SubjectBadge(subject: subject)
-                    if !assignment.submissionMethod.isEmpty {
-                        Label(assignment.submissionMethod, systemImage: "paperplane")
-                            .font(.caption).foregroundStyle(.tertiary).lineLimit(1)
-                    }
+                    SubmissionMethodView(value: assignment.submissionMethod, compact: true)
                 }
             }
             Spacer(minLength: 16)

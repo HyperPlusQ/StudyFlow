@@ -7,6 +7,8 @@ struct SubjectEditorView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query(sort: \SubmissionHistoryEntry.lastUsedAt, order: .reverse)
+    private var submissionHistory: [SubmissionHistoryEntry]
 
     @State private var name: String
     @State private var symbol: String
@@ -30,6 +32,11 @@ struct SubjectEditorView: View {
         _symbol = State(initialValue: existing?.symbol ?? "book.closed")
         _colorHex = State(initialValue: existing?.colorHex ?? "#4F7DF3")
         _parentId = State(initialValue: existing?.parentId)
+    }
+
+    private var historyEntries: [SubmissionHistoryEntry] {
+        guard let existing else { return [] }
+        return submissionHistory.filter { $0.subjectId == existing.id }
     }
 
     private var allowedParents: [Subject] {
@@ -58,10 +65,37 @@ struct SubjectEditorView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+
+                if existing != nil {
+                    Section("提交方式历史") {
+                        if historyEntries.isEmpty {
+                            Text("这个科目还没有历史记录。为作业填写并保存提交方式后会自动出现在这里。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(historyEntries) { entry in
+                                HStack(spacing: 10) {
+                                    SubmissionMethodView(value: entry.value)
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        SubmissionHistoryStore.delete(entry, context: context)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("从本科目的历史记录中删除")
+                                }
+                            }
+                        }
+                        Text("历史记录只用于快速填写，不会改变已有作业；可逐条手动删除。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
             }
             .formStyle(.grouped)
             .navigationTitle(existing == nil ? "新建科目" : "编辑科目")
-            .frame(width: 480, height: 540)
+            .frame(width: 520, height: 620)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

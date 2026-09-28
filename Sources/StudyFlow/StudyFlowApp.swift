@@ -10,7 +10,8 @@ struct StudyFlowApp: App {
             Subject.self,
             Assignment.self,
             Subtask.self,
-            TimeBlock.self
+            TimeBlock.self,
+            SubmissionHistoryEntry.self
         ])
 
         do {
@@ -65,6 +66,7 @@ struct StudyFlowApp: App {
 
         Settings {
             SettingsView()
+                .modelContainer(container)
         }
     }
 }

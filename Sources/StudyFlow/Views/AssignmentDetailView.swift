@@ -118,8 +118,7 @@ struct AssignmentDetailView: View {
                     }
                 }
                 LabeledContent("提交方式") {
-                    Text(assignment.submissionMethod.isEmpty ? "未填写" : assignment.submissionMethod)
-                        .foregroundStyle(assignment.submissionMethod.isEmpty ? .tertiary : .primary)
+                    SubmissionMethodView(value: assignment.submissionMethod)
                 }
                 LabeledContent("提醒") {
                     Text(reminderLabel)
