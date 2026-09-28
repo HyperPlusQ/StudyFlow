@@ -270,7 +270,7 @@ struct AssignmentEditorView: View {
         }
 
         reconcileSubtasks(for: assignment)
-        try? context.save()
+        PersistentStore.save(context)
         NotificationManager.shared.schedule(for: assignment)
         dismiss()
     }

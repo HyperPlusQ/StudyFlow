@@ -1,3 +1,4 @@
+import Observation
 import SwiftData
 import SwiftUI
 
@@ -21,6 +22,7 @@ struct ContentView: View {
     @State private var newSubjectParent: Subject?
     @State private var editingSubject: Subject?
     @State private var showNewTimeBlock = false
+    @State private var syncCoordinator = ICloudSyncCoordinator.shared
 
     var body: some View {
         NavigationSplitView {
@@ -65,7 +67,13 @@ struct ContentView: View {
         }
         .navigationTitle(selection.scope.title)
         .task {
+            syncCoordinator.performLaunchSyncIfNeeded(context: context)
             await NotificationManager.shared.requestAuthorization()
+        }
+        .onReceive(
+            Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+        ) { _ in
+            syncCoordinator.checkScheduledSyncIfNeeded(context: context)
         }
         .onReceive(NotificationCenter.default.publisher(for: .studyFlowNewAssignment)) { _ in
             showNewAssignment = true
@@ -105,6 +113,7 @@ struct SettingsView: View {
     @State private var notice: String?
     @State private var updateState: UpdateCheckState = .idle
     @State private var exportNotice: String?
+    @State private var syncCoordinator = ICloudSyncCoordinator.shared
 
     var body: some View {
         Form {
@@ -173,6 +182,84 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("iCloud 自动同步") {
+                Toggle(
+                    "每次打开和到时自动同步",
+                    isOn: Binding(
+                        get: { syncCoordinator.isEnabled },
+                        set: { enabled in
+                            if !syncCoordinator.setEnabled(enabled, context: context) {
+                                notice = "未选择同步文件夹，自动同步保持关闭。"
+                            }
+                        }
+                    )
+                )
+                .toggleStyle(.switch)
+
+                DatePicker(
+                    "每日同步时间",
+                    selection: Binding(
+                        get: {
+                            var components = DateComponents()
+                            components.hour = syncCoordinator.syncHour
+                            components.minute = syncCoordinator.syncMinute
+                            return Calendar.current.date(from: components) ?? .now
+                        },
+                        set: { date in
+                            let components = Calendar.current.dateComponents(
+                                [.hour, .minute],
+                                from: date
+                            )
+                            syncCoordinator.setSyncTime(
+                                hour: components.hour ?? 21,
+                                minute: components.minute ?? 0
+                            )
+                        }
+                    ),
+                    displayedComponents: .hourAndMinute
+                )
+                .disabled(!syncCoordinator.isEnabled)
+
+                LabeledContent("同步文件夹") {
+                    Text(syncCoordinator.folderName ?? "尚未选择")
+                        .foregroundStyle(syncCoordinator.folderName == nil ? .secondary : .primary)
+                }
+
+                LabeledContent("同步状态") {
+                    Text(syncCoordinator.lastMessage)
+                        .foregroundStyle(.secondary)
+                }
+
+                if let lastSync = syncCoordinator.lastSyncDate {
+                    LabeledContent("上次同步") {
+                        Text(lastSync.formatted(date: .abbreviated, time: .shortened))
+                            .monospacedDigit()
+                    }
+                }
+
+                HStack {
+                    Button {
+                        syncCoordinator.chooseFolder(context: context)
+                    } label: {
+                        Label("更改同步文件夹…", systemImage: "folder")
+                    }
+                    .disabled(!syncCoordinator.isEnabled)
+
+                    Button {
+                        syncCoordinator.synchronize(context: context)
+                    } label: {
+                        Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
+                    }
+                    .disabled(!syncCoordinator.isEnabled)
+
+                    Spacer()
+                }
+
+                Text("开启后，每次打开 StudyFlow 都会同步；到达设定时间后，在应用运行期间也会自动同步。系统比较本地与 iCloud 中 \(ICloudSyncCoordinator.fileName) 的修改时间，并用较新的文件覆盖较旧的文件。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("备份与 iCloud") {
                 LabeledContent("存储方式") { Text("SwiftData 本地存储") }
                 LabeledContent("云盘备份") { Text("iCloud 云盘 JSON 导出") }
@@ -197,7 +284,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 650)
+        .frame(width: 560, height: 760)
         .alert("设置", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("好") { notice = nil }
         } message: {

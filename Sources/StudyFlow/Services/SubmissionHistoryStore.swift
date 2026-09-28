@@ -21,6 +21,7 @@ final class SubmissionHistoryEntry {
     }
 }
 
+@MainActor
 enum SubmissionHistoryStore {
     static func remember(value: String, subjectId: UUID?, context: ModelContext) {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -42,7 +43,7 @@ enum SubmissionHistoryStore {
                 SubmissionHistoryEntry(subjectId: subjectId, value: trimmed)
             )
         }
-        try? context.save()
+        PersistentStore.save(context)
     }
 
     static func entries(for subjectId: UUID?, context: ModelContext) -> [SubmissionHistoryEntry] {
@@ -58,7 +59,7 @@ enum SubmissionHistoryStore {
 
     static func delete(_ entry: SubmissionHistoryEntry, context: ModelContext) {
         context.delete(entry)
-        try? context.save()
+        PersistentStore.save(context)
     }
 
     private static func normalizedKey(_ value: String) -> String {

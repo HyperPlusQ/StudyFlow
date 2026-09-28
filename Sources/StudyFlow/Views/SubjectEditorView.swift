@@ -124,7 +124,7 @@ struct SubjectEditorView: View {
             )
             context.insert(subject)
         }
-        try? context.save()
+        PersistentStore.save(context)
         dismiss()
     }
 }

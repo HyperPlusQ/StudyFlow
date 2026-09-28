@@ -60,7 +60,7 @@ struct AssignmentDetailView: View {
                     _ = try? CalendarService.shared.removeEvent(for: assignment)
                 }
                 context.delete(assignment)
-                try? context.save()
+                PersistentStore.save(context)
             }
             Button("取消", role: .cancel) {}
         } message: {
@@ -147,7 +147,7 @@ struct AssignmentDetailView: View {
                                 get: { subtask.isCompleted },
                                 set: { value in
                                     subtask.isCompleted = value
-                                    try? context.save()
+                                    PersistentStore.save(context)
                                 }
                             ))
                             .toggleStyle(.checkbox)
@@ -158,7 +158,7 @@ struct AssignmentDetailView: View {
                             Spacer()
                             Button {
                                 context.delete(subtask)
-                                try? context.save()
+                                PersistentStore.save(context)
                             } label: {
                                 Image(systemName: "minus.circle")
                             }
@@ -200,7 +200,7 @@ struct AssignmentDetailView: View {
                         Spacer()
                         Button {
                             context.delete(block)
-                            try? context.save()
+                            PersistentStore.save(context)
                         } label: {
                             Image(systemName: "trash")
                         }
@@ -272,7 +272,7 @@ struct AssignmentDetailView: View {
         )
         context.insert(item)
         assignment.updatedAt = .now
-        try? context.save()
+        PersistentStore.save(context)
         newSubtaskTitle = ""
     }
 
@@ -288,7 +288,7 @@ struct AssignmentDetailView: View {
             NotificationManager.shared.cancel(for: assignment.id)
         }
         assignment.updatedAt = .now
-        try? context.save()
+        PersistentStore.save(context)
     }
 
     private func syncCalendar() async {
@@ -296,7 +296,7 @@ struct AssignmentDetailView: View {
         defer { isSyncing = false }
         do {
             try await CalendarService.shared.sync(assignment, subjectName: subject?.name)
-            try? context.save()
+            PersistentStore.save(context)
             notice = "作业已同步到系统日历。"
         } catch {
             notice = error.localizedDescription

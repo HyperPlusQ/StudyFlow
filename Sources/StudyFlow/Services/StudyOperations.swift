@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+@MainActor
 enum StudyOperations {
     static func descendants(of subject: Subject, in subjects: [Subject]) -> [Subject] {
         var queue = [subject]
@@ -27,7 +28,11 @@ enum StudyOperations {
         for block in (try? context.fetch(FetchDescriptor<TimeBlock>())) ?? [] where block.subjectId == subject.id {
             block.subjectId = nil
         }
+        for entry in (try? context.fetch(FetchDescriptor<SubmissionHistoryEntry>())) ?? []
+        where entry.subjectId == subject.id {
+            context.delete(entry)
+        }
         context.delete(subject)
-        try? context.save()
+        PersistentStore.save(context)
     }
 }

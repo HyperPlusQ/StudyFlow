@@ -139,6 +139,28 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 - 一键预选 iCloud 云盘目录，通过 macOS 系统保存面板完成云盘备份；
 - JSON 中包含科目、作业、子任务、时间块和提交方式历史。
 
+### iCloud Drive 自动同步
+
+在“设置 → iCloud 自动同步”中可以：
+
+- 打开或关闭“每次打开和到时自动同步”，首次开启时使用 macOS 系统面板选择 iCloud 云盘文件夹；
+- 设置每日同步时间，应用运行到该时间后自动执行一次；
+- 每次启动主窗口时自动执行同步，跨过设定时间后不会重复同步当天任务；
+- 随时点击“立即同步”，并查看同步状态与上次同步时间；
+- 手动更改同步文件夹，安全范围书签由 App Sandbox 持久保存。
+
+同步文件固定命名为 `StudyFlow-Sync.json`，分别保存在应用的 Application Support 与所选 iCloud 文件夹。每次同步会比较两个文件的修改时间：
+
+```text
+本地修改时间 > iCloud 修改时间  → 用本地 JSON 覆盖 iCloud JSON
+iCloud 修改时间 > 本地修改时间  → 导入 iCloud JSON 并覆盖本地 JSON
+修改时间相同                  → 不覆盖
+只有一侧存在                  → 把存在的一侧同步到另一侧
+两侧都不存在                  → 用当前 SwiftData 数据创建两个文件
+```
+
+用户保存作业、科目、子任务、时间块或提交历史时，本地比较文件会同步刷新；恢复 iCloud 中较新的数据后，应用会重建本地通知。
+
 ### 系统日历同步
 
 通过 `EventKit` 支持：
@@ -167,7 +189,9 @@ StudyFlow/
 │   │   ├── NotificationManager.swift   # 本地通知授权与调度
 │   │   ├── CalendarService.swift       # EventKit 同步
 │   │   ├── GitHubUpdateService.swift   # GitHub 更新检查
-│   │   ├── DataExportService.swift     # JSON / iCloud 云盘导出
+│   │   ├── DataExportService.swift     # JSON 导出与完整快照恢复
+│   │   ├── ICloudSyncCoordinator.swift # iCloud 启动/定时同步协调
+│   │   ├── PersistentStore.swift       # 保存并刷新本地同步镜像
 │   │   ├── SubmissionMethod.swift      # 网址与邮件目标识别
 │   │   ├── SubmissionHistoryStore.swift# 科目提交方式历史
 │   │   └── StudyOperations.swift       # 科目层级与安全删除操作
@@ -200,7 +224,7 @@ StudyFlow/
 - `TimeBlock`：工作时间块；
 - `SubmissionHistoryEntry`：按科目保存的提交方式历史。
 
-默认数据库位于当前应用的 macOS Sandbox 容器中。若设置了 `STUDYFLOW_STORE_PATH` 环境变量，应用会改用指定的 SQLite 文件；该选项主要用于自动化测试或便携式数据目录：
+默认数据库位于当前应用的 macOS Sandbox 容器中。开启 iCloud 自动同步后，SwiftData 数据还会维护 `Application Support/StudyFlow/Sync/StudyFlow-Sync.json` 本地比较文件。若设置了 `STUDYFLOW_STORE_PATH` 环境变量，应用会改用指定的 SQLite 文件；该选项主要用于自动化测试或便携式数据目录：
 
 ```bash
 STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
@@ -208,9 +232,9 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 
 ### iCloud 与同步状态
 
-应用数据默认保存在 SwiftData SQLite 数据库中。设置窗口支持把完整数据导出为 JSON，并可从保存面板直接选择 **iCloud 云盘**，形成可迁移的云盘备份。
+应用数据默认保存在 SwiftData SQLite 数据库中。设置窗口既支持把完整数据导出为 JSON，也支持开启 **iCloud Drive 文件自动同步**：启动应用或到达每日设定时间后，按本地与 iCloud 文件的修改时间执行“新者覆盖旧者”。
 
-当前版本提供的是 **iCloud 云盘文件备份**，尚未启用 CloudKit 自动多设备同步；数据模型使用稳定 UUID 关联对象，未来可以接入 `ModelConfiguration(cloudKitDatabase:)` 或其他同步层。
+当前同步基于用户选择的 iCloud 文件夹与 JSON 快照，不使用 CloudKit；这样可以明确控制冲突结果并保持数据可迁移。数据模型使用稳定 UUID 关联对象，未来仍可接入 `ModelConfiguration(cloudKitDatabase:)`。
 
 ---
 
@@ -221,7 +245,7 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 - `com.apple.security.app-sandbox`：macOS App Sandbox；
 - `com.apple.security.personal-information.calendars`：日历访问；
 - `com.apple.security.network.client`：从 GitHub 检查软件更新；
-- `com.apple.security.files.user-selected.read-write`：通过系统面板导出 JSON 或保存到 iCloud 云盘；
+- `com.apple.security.files.user-selected.read-write`：通过系统面板导出 JSON，并持久访问用户选择的 iCloud 同步文件夹；
 - `NSCalendarsFullAccessUsageDescription`：macOS 14 日历权限用途说明；
 - `NSCalendarsUsageDescription`：兼容性用途说明。
 

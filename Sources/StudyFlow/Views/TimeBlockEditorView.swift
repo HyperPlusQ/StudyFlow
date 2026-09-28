@@ -81,7 +81,7 @@ struct TimeBlockEditorView: View {
             notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
         )
         context.insert(block)
-        try? context.save()
+        PersistentStore.save(context)
         dismiss()
     }
 }

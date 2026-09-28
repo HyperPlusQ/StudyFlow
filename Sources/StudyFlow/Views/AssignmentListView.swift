@@ -179,7 +179,7 @@ struct AssignmentListView: View {
             NotificationManager.shared.cancel(for: assignment.id)
         }
         assignment.updatedAt = .now
-        try? context.save()
+        PersistentStore.save(context)
     }
 }
 
