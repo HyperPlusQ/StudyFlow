@@ -1,3 +1,4 @@
+import AppKit
 import SwiftData
 import SwiftUI
 
@@ -34,12 +35,25 @@ struct StudyFlowApp: App {
         }
     }
 
+    private static var didApplyPackagedIcon = false
+
+    static func applyPackagedIconIfNeeded() {
+        guard !didApplyPackagedIcon else { return }
+        didApplyPackagedIcon = true
+
+        guard let url = Bundle.main.url(forResource: "AppIcon", withExtension: "icns"),
+              let image = NSImage(contentsOf: url)
+        else { return }
+        NSApplication.shared.applicationIconImage = image
+    }
+
     var body: some Scene {
         WindowGroup("StudyFlow") {
             ContentView()
                 .modelContainer(container)
                 .frame(minWidth: 1_000, minHeight: 680)
                 .onAppear {
+                    StudyFlowApp.applyPackagedIconIfNeeded()
                     NSApplication.shared.setActivationPolicy(.regular)
                     NSApp.activate(ignoringOtherApps: true)
                 }

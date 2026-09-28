@@ -74,8 +74,9 @@ struct DashboardView: View {
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: onNewBlock) {
-                    Label("新建时间块", systemImage: "clock.badge.plus")
+                    SafeSystemImage(systemName: "clock.badge.plus", fallback: "clock")
                 }
+                .accessibilityLabel("新建时间块")
             }
         }
     }
@@ -209,7 +210,7 @@ struct DashboardView: View {
                                 }
                             }
                             Spacer()
-                            Image(systemName: task.priority.symbol)
+                            SafeSystemImage(systemName: task.priority.symbol, fallback: "exclamationmark")
                                 .foregroundStyle(task.priority == .critical ? .red : .secondary)
                         }
                         Divider()
@@ -268,7 +269,9 @@ struct DashboardView: View {
 
     private func emptyChart(_ symbol: String, _ title: String, _ message: String) -> some View {
         VStack(spacing: 8) {
-            Image(systemName: symbol).font(.title).foregroundStyle(.tertiary)
+            SafeSystemImage(systemName: symbol, fallback: "circle")
+                .font(.title)
+                .foregroundStyle(.tertiary)
             Text(title).font(.callout.weight(.medium))
             Text(message).font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center)
         }

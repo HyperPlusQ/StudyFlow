@@ -51,7 +51,7 @@ struct SidebarView: View {
                     Text("科目")
                     Spacer()
                     Button { onNewSubject(nil) } label: {
-                        Image(systemName: "plus")
+                        SafeSystemImage(systemName: "plus", fallback: "circle")
                     }
                     .buttonStyle(.borderless)
                     .help("新建科目")
@@ -63,8 +63,11 @@ struct SidebarView: View {
         .navigationSubtitle("学习与作业")
         .safeAreaInset(edge: .bottom) {
             Button(action: onNewAssignment) {
-                Label("新建作业", systemImage: "plus")
-                    .frame(maxWidth: .infinity)
+                HStack(spacing: 7) {
+                    SafeSystemImage(systemName: "plus", fallback: "circle")
+                    Text("新建作业")
+                }
+                .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -136,7 +139,7 @@ struct SidebarView: View {
 
     private func subjectLabel(_ subject: Subject, count: Int, level: Int) -> some View {
         HStack(spacing: 7) {
-            Image(systemName: subject.symbol)
+            SafeSystemImage(systemName: subject.symbol, fallback: "book.closed")
                 .foregroundStyle(Color(hex: subject.colorHex))
                 .frame(width: 16)
             Text(subject.name)
@@ -167,7 +170,9 @@ struct SidebarView: View {
             selection = SidebarSelection(scope: scope)
         } label: {
             HStack {
-                Label(scope.title, systemImage: scope.symbol)
+                SafeSystemImage(systemName: scope.symbol, fallback: "circle")
+                    .frame(width: 16)
+                Text(scope.title)
                 Spacer()
                 if let count, count > 0 {
                     Text("\(count)").font(.caption).foregroundStyle(.secondary).monospacedDigit()

@@ -43,9 +43,12 @@ struct SubjectBadge: View {
 
     var body: some View {
         HStack(spacing: 5) {
-            Image(systemName: subject?.symbol ?? "square.dashed")
-                .font(.caption2)
-                .foregroundStyle(subject.map { Color(hex: $0.colorHex) } ?? .secondary)
+            SafeSystemImage(
+                systemName: subject?.symbol ?? "square.dashed",
+                fallback: "square.dashed"
+            )
+            .font(.caption2)
+            .foregroundStyle(subject.map { Color(hex: $0.colorHex) } ?? .secondary)
             if !compact {
                 Text(subject?.name ?? "未分类")
                     .font(.caption)
@@ -109,9 +112,12 @@ struct StatCard: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Label(title, systemImage: symbol)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(.secondary)
+                HStack(spacing: 6) {
+                    SafeSystemImage(systemName: symbol, fallback: "circle")
+                    Text(title)
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.secondary)
                 Spacer()
             }
             Text(value)
@@ -138,7 +144,7 @@ struct EmptyStateView: View {
 
     var body: some View {
         VStack(spacing: 14) {
-            Image(systemName: symbol)
+            SafeSystemImage(systemName: symbol, fallback: "tray")
                 .font(.system(size: 44, weight: .light))
                 .foregroundStyle(.tertiary)
                 .symbolRenderingMode(.hierarchical)
@@ -167,7 +173,8 @@ struct SectionHeader: View {
     var body: some View {
         HStack(alignment: .firstTextBaseline) {
             if let systemImage {
-                Image(systemName: systemImage).foregroundStyle(.secondary)
+                SafeSystemImage(systemName: systemImage, fallback: "circle")
+                    .foregroundStyle(.secondary)
             }
             VStack(alignment: .leading, spacing: 2) {
                 Text(title).font(.headline)

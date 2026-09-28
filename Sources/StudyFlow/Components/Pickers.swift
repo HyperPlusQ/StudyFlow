@@ -11,7 +11,8 @@ struct IconPicker: View {
                 Button {
                     selection = icon
                 } label: {
-                    Image(systemName: icon)
+                    SafeSystemImage(systemName: icon, fallback: "circle")
+                        .symbolRenderingMode(.hierarchical)
                         .frame(width: 30, height: 30)
                         .background(selection == icon ? Color.accentColor.opacity(0.18) : Color.clear)
                 }

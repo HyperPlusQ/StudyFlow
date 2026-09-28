@@ -106,14 +106,23 @@ struct AssignmentListView: View {
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button { showFilters.toggle() } label: {
-                    Label("筛选", systemImage: filter.isDefault ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill")
+                    SafeSystemImage(
+                        systemName: filter.isDefault
+                            ? "line.3.horizontal.decrease.circle"
+                            : "line.3.horizontal.decrease.circle.fill",
+                        fallback: "slider.horizontal.3"
+                    )
                 }
+                .accessibilityLabel("筛选")
                 .popover(isPresented: $showFilters, arrowEdge: .bottom) {
                     FilterPopover(filter: $filter, subjects: subjects)
                         .frame(width: 340)
                 }
-                Button(action: onNewAssignment) { Label("新建作业", systemImage: "plus") }
-                    .keyboardShortcut("n", modifiers: [.command])
+                Button(action: onNewAssignment) {
+                    SafeSystemImage(systemName: "plus", fallback: "circle")
+                }
+                .accessibilityLabel("新建作业")
+                .keyboardShortcut("n", modifiers: [.command])
             }
         }
         .inspector(isPresented: Binding(
@@ -194,8 +203,11 @@ struct AssignmentRow: View {
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggle) {
-                Image(systemName: assignment.isCompleted ? "checkmark.circle.fill" : "circle")
-                    .font(.title3)
+                SafeSystemImage(
+                    systemName: assignment.isCompleted ? "checkmark.circle.fill" : "circle",
+                    fallback: "circle"
+                )
+                .font(.title3)
                     .foregroundStyle(assignment.isCompleted ? .green : .secondary)
                     .symbolRenderingMode(.hierarchical)
             }
@@ -230,7 +242,7 @@ struct AssignmentRow: View {
             VStack(alignment: .trailing, spacing: 7) {
                 DueLabel(date: assignment.dueDate, completed: assignment.isCompleted)
                 HStack(spacing: 4) {
-                    Image(systemName: assignment.priority.symbol)
+                    SafeSystemImage(systemName: assignment.priority.symbol, fallback: "exclamationmark")
                     Text(assignment.priority.label)
                 }
                 .font(.caption2)
