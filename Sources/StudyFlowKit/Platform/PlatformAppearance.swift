@@ -101,36 +101,74 @@ struct StudyFlowBackdrop: View {
 }
 
 extension View {
+    /// Uses Apple's native Liquid Glass button on supported systems, with a
+    /// larger continuous-corner bordered fallback on earlier releases.
     @ViewBuilder
-    func studyFlowGlassSurface(cornerRadius: CGFloat = 16, prominent: Bool = false) -> some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-        background {
+    func studyFlowGlassButtonStyle(
+        prominent: Bool = false,
+        cornerRadius: CGFloat = 18
+    ) -> some View {
+        if #available(macOS 26.0, iOS 26.0, *) {
             if prominent {
-                shape.fill(.regularMaterial)
+                buttonStyle(.glassProminent)
             } else {
-                shape.fill(.thinMaterial)
+                buttonStyle(.glass)
+            }
+        } else {
+            let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+            if prominent {
+                buttonStyle(.borderedProminent).clipShape(shape)
+            } else {
+                buttonStyle(.bordered).clipShape(shape)
             }
         }
-        .clipShape(shape)
-        .overlay {
-            shape.strokeBorder(
-                Color.white.opacity(0.16),
-                lineWidth: 1
-            )
+    }
+
+    @ViewBuilder
+    func studyFlowGlassSurface(cornerRadius: CGFloat = 20, prominent: Bool = false) -> some View {
+        let radius = max(cornerRadius, 20)
+        let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
+
+        if #available(macOS 26.0, iOS 26.0, *) {
+            let glass: Glass = .regular
+            self
+                .clipShape(shape)
+                .glassEffect(glass, in: shape)
+        } else {
+            background {
+                if prominent {
+                    shape.fill(.regularMaterial)
+                } else {
+                    shape.fill(.thinMaterial)
+                }
+            }
+            .clipShape(shape)
+            .overlay {
+                shape.strokeBorder(
+                    Color.white.opacity(0.16),
+                    lineWidth: 1
+                )
+            }
+            .shadow(color: .black.opacity(0.10), radius: 14, y: 5)
         }
-        .shadow(color: .black.opacity(0.10), radius: 14, y: 5)
     }
 
     @ViewBuilder
     func platformTransparentToolbar() -> some View {
         #if os(macOS)
-        if #available(macOS 15.0, *) {
+        if #available(macOS 26.0, *) {
+            // Preserve the system toolbar's native Liquid Glass material.
+            self
+        } else if #available(macOS 15.0, *) {
             toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
         } else {
             toolbarBackground(.hidden, for: .windowToolbar)
         }
         #else
-        if #available(iOS 18.0, *) {
+        if #available(iOS 26.0, *) {
+            // Preserve the system navigation bar's native Liquid Glass material.
+            self
+        } else if #available(iOS 18.0, *) {
             toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         } else {
             toolbarBackground(.hidden, for: .navigationBar)

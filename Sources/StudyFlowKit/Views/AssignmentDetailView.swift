@@ -91,7 +91,7 @@ struct AssignmentDetailView: View {
                         systemImage: assignment.isCompleted ? "arrow.uturn.backward" : "checkmark"
                     )
                 }
-                .buttonStyle(.borderedProminent)
+                .studyFlowGlassButtonStyle(prominent: true)
             }
             ProgressView(value: assignment.progress) {
                 HStack {
@@ -213,6 +213,7 @@ struct AssignmentDetailView: View {
             Button(action: onSchedule) {
                 Label("安排工作时间…", systemImage: "calendar.badge.plus")
             }
+            .studyFlowGlassButtonStyle()
         }
     }
 
@@ -222,7 +223,7 @@ struct AssignmentDetailView: View {
                 Label("编辑作业…", systemImage: "pencil")
                     .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .studyFlowGlassButtonStyle()
             .controlSize(.large)
 
             Button {
@@ -234,7 +235,7 @@ struct AssignmentDetailView: View {
                 )
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.bordered)
+            .studyFlowGlassButtonStyle()
             .controlSize(.large)
             .disabled(isSyncing || assignment.dueDate == nil)
 

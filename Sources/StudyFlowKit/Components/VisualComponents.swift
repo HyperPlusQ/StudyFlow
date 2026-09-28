@@ -129,7 +129,7 @@ struct StatCard: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-                .studyFlowGlassSurface(cornerRadius: 15)
+                .studyFlowGlassSurface(cornerRadius: 20)
     }
 }
 
@@ -154,7 +154,7 @@ struct EmptyStateView: View {
                 .frame(maxWidth: 420)
             if let actionTitle, let action {
                 Button(actionTitle, action: action)
-                    .buttonStyle(.borderedProminent)
+                    .studyFlowGlassButtonStyle(prominent: true)
                     .controlSize(.large)
             }
         }

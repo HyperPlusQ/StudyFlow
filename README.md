@@ -7,6 +7,7 @@ StudyFlow 是一款使用 **SwiftUI + SwiftData** 构建的 macOS 原生生产�
 ## 下载预构建应用
 
 - [StudyFlow-macOS.zip](Releases/StudyFlow-macOS.zip) — Apple Silicon（arm64），macOS 14+
+- [StudyFlowKit-iOS17-Release.zip](Releases/StudyFlowKit-iOS17-Release.zip) — iOS 17 release 静态库与 Swift 模块（设备与模拟器）
 - 解压后直接运行 `StudyFlow.app`；也可下载源码后执行构建脚本。
 
 ## 快速开始
@@ -77,12 +78,14 @@ CODE_SIGN_IDENTITY="-" ./Scripts/build-app.sh
 - 按科目记忆曾经填写的提交方式，编辑作业时可从建议菜单快速选择；
 - 科目编辑窗口支持逐条手动删除提交历史。
 
-### 通透材质与可靠图标
+### Liquid Glass、通透材质与可靠图标
 
+- macOS 26 / iOS 26 及更高版本的主操作按钮使用系统原生 `.glass` / `.glassProminent` Liquid Glass 样式；
+- 仪表盘卡片与统计卡片使用系统 `glassEffect`，并统一增大到 20pt 连续圆角；
+- macOS 14–25、iOS 17–25 自动回退到原生 `bordered` / `borderedProminent` 与更大连续圆角，保证兼容性；
 - 主窗口采用低饱和度渐变背景，并结合系统 `thinMaterial` / `regularMaterial`；
-- 仪表盘卡片、统计卡片与 Inspector 使用连续圆角、细描边和轻阴影；
 - 侧边栏保留系统原生结构与宽度调节，并叠加系统高斯模糊材质；
-- 工具栏背景透明，让内容与系统窗口材质自然衔接；
+- 新系统保留系统工具栏 Liquid Glass 材质；旧系统继续使用透明工具栏背景，让内容与窗口材质自然衔接；
 - SF Symbol 在读取、编辑与展示前进行运行时可用性检查，不支持的图标自动回退；
 - 科目图标选择器只展示当前系统可用图标，并始终保留通用兜底项；
 - 通过 SwiftPM 直接在 Xcode 中运行时，也会从应用内资源加载 StudyFlow 图标。
@@ -223,14 +226,27 @@ StudyFlow/
 - SwiftUI 的 `.help`、checkbox、链接按钮、导航副标题与背景色差异由 `PlatformAppearance.swift` 集中处理；
 - `StudyFlowMacOS` 只保留 App Scene、菜单命令、macOS 签名所需的入口和平台适配器。
 
-SwiftPM 同时声明 `macOS 14` 与 `iOS 17`，因此可以先验证共享库的 iOS 编译：
+SwiftPM 同时声明 `macOS 14` 与 `iOS 17`，因此可以分别验证共享库的 iOS release 编译：
 
 ```bash
-swift build \
-  --disable-sandbox \
+# iOS 设备 release
+HOME="$PWD/.home" TMPDIR="$PWD/.tmp" \
+CLANG_MODULE_CACHE_PATH="$PWD/.build/ios-module-cache" \
+xcrun swift build --disable-sandbox -c release \
+  --triple arm64-apple-ios17.0 \
+  --sdk "$(xcrun --sdk iphoneos --show-sdk-path)" \
+  --product StudyFlowKit
+
+# iOS 模拟器 release
+HOME="$PWD/.home" TMPDIR="$PWD/.tmp" \
+CLANG_MODULE_CACHE_PATH="$PWD/.build/ios-module-cache" \
+xcrun swift build --disable-sandbox -c release \
   --triple arm64-apple-ios17.0-simulator \
+  --sdk "$(xcrun --sdk iphonesimulator --show-sdk-path)" \
   --product StudyFlowKit
 ```
+
+release 产物位于 `.build/out/Products/Release-iphoneos` 与 `.build/out/Products/Release-iphonesimulator`，并可打包为 `Releases/StudyFlowKit-iOS17-Release.zip`。
 
 未来创建 iOS App target 时，只需提供 SwiftUI 入口，并向 `StudyFlowRootView`/`StudyFlowSettingsView` 注入 iOS 版导出与文件选择器实现。
 
@@ -303,7 +319,8 @@ STUDYFLOW_STORE_PATH=/path/to/StudyFlow.store open dist/StudyFlow.app
 - Swift 6 全量类型检查；
 - `StudyFlowKit` 8 项单元测试（智能排序与提交方式识别）；
 - macOS release 编译与完整应用包构建；
-- iOS 17 simulator 下的 `StudyFlowKit` 编译检查；
+- iOS 17 设备与模拟器 release 下的 `StudyFlowKit` 编译检查；
+- Liquid Glass 可用性分支与旧系统回退样式的编译检查；
 - `codesign --verify --deep --strict`；
 - `plutil -lint` 属性列表校验；
 - SwiftData 测试数据库初始化检查。

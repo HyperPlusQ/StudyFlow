@@ -86,7 +86,7 @@ struct SidebarView: View {
                 }
                 .frame(maxWidth: .infinity)
             }
-            .buttonStyle(.borderedProminent)
+            .studyFlowGlassButtonStyle(prominent: true)
             .controlSize(.large)
             .keyboardShortcut("n", modifiers: [.command])
             .padding(8)

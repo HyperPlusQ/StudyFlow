@@ -174,6 +174,7 @@ struct SettingsView: View {
                             Label("从 GitHub 检查更新", systemImage: "arrow.clockwise.circle")
                         }
                     }
+                    .studyFlowGlassButtonStyle(prominent: true)
                     .disabled({
                         if case .checking = updateState { return true }
                         return false
@@ -183,7 +184,7 @@ struct SettingsView: View {
 
                     if case let .updateAvailable(_, url) = updateState {
                         Link("查看更新", destination: url)
-                            .buttonStyle(.borderedProminent)
+                            .studyFlowGlassButtonStyle(prominent: true)
                     }
                 }
                 if case .failed = updateState {
@@ -260,6 +261,7 @@ struct SettingsView: View {
                     } label: {
                         Label("更改同步文件夹…", systemImage: "folder")
                     }
+                    .studyFlowGlassButtonStyle()
                     .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
 
                     Button {
@@ -267,6 +269,7 @@ struct SettingsView: View {
                     } label: {
                         Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
                     }
+                    .studyFlowGlassButtonStyle(prominent: true)
                     .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
 
                     Spacer()
@@ -287,6 +290,7 @@ struct SettingsView: View {
                     } label: {
                         Label("导出 JSON…", systemImage: "square.and.arrow.up")
                     }
+                    .studyFlowGlassButtonStyle()
                     .disabled(exporter == nil)
 
                     Button {
@@ -294,6 +298,7 @@ struct SettingsView: View {
                     } label: {
                         Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
                     }
+                    .studyFlowGlassButtonStyle(prominent: true)
                     .disabled(exporter == nil)
                 }
 
