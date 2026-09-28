@@ -189,6 +189,24 @@ struct AssignmentListView: View {
         }
         assignment.updatedAt = .now
         PersistentStore.save(context)
+        synchronizeCalendarAfterCompletion(for: assignment)
+    }
+
+    @MainActor
+    private func synchronizeCalendarAfterCompletion(for assignment: Assignment) {
+        let subjectName = assignment.subjectId.flatMap { subjectMap[$0]?.name }
+
+        Task {
+            do {
+                try await CalendarService.shared.synchronizeAfterAssignmentChange(
+                    assignment,
+                    subjectName: subjectName
+                )
+                PersistentStore.save(context)
+            } catch {
+                NSLog("StudyFlow 日历同步失败：%@", error.localizedDescription)
+            }
+        }
     }
 }
 

@@ -272,7 +272,27 @@ struct AssignmentEditorView: View {
         reconcileSubtasks(for: assignment)
         PersistentStore.save(context)
         NotificationManager.shared.schedule(for: assignment)
+        synchronizeCalendarAfterSave(for: assignment)
         dismiss()
+    }
+
+    @MainActor
+    private func synchronizeCalendarAfterSave(for assignment: Assignment) {
+        let subjectName = assignment.subjectId.flatMap { id in
+            subjects.first { $0.id == id }?.name
+        }
+
+        Task {
+            do {
+                try await CalendarService.shared.synchronizeAfterAssignmentChange(
+                    assignment,
+                    subjectName: subjectName
+                )
+                PersistentStore.save(context)
+            } catch {
+                NSLog("StudyFlow 日历同步失败：%@", error.localizedDescription)
+            }
+        }
     }
 
     private func reconcileSubtasks(for assignment: Assignment) {

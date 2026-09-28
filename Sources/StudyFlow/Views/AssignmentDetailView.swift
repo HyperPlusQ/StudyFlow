@@ -226,17 +226,23 @@ struct AssignmentDetailView: View {
             .controlSize(.large)
 
             Button {
-                Task { await syncCalendar() }
+                Task { await performCalendarAction() }
             } label: {
-                Label(
-                    isSyncing ? "正在同步…" : (assignment.calendarEventIdentifier != nil ? "更新系统日历" : "添加到系统日历"),
-                    systemImage: assignment.calendarEventIdentifier != nil ? "calendar.badge.checkmark" : "calendar.badge.plus"
-                )
+                HStack(spacing: 7) {
+                    SafeSystemImage(
+                        systemName: calendarActionSymbol,
+                        fallback: "calendar"
+                    )
+                    Text(calendarActionTitle)
+                }
                 .frame(maxWidth: .infinity)
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
-            .disabled(isSyncing || assignment.dueDate == nil)
+            .disabled(
+                isSyncing ||
+                (assignment.calendarEventIdentifier == nil && assignment.dueDate == nil)
+            )
 
             Button(role: .destructive) {
                 confirmDelete = true
@@ -276,6 +282,15 @@ struct AssignmentDetailView: View {
         newSubtaskTitle = ""
     }
 
+    private var calendarActionTitle: String {
+        if isSyncing { return "正在处理…" }
+        return assignment.calendarEventIdentifier != nil ? "取消日历同步" : "添加到系统日历"
+    }
+
+    private var calendarActionSymbol: String {
+        assignment.calendarEventIdentifier != nil ? "calendar.badge.minus" : "calendar.badge.plus"
+    }
+
     private func toggleCompletion() {
         if assignment.isCompleted {
             assignment.status = .active
@@ -289,15 +304,38 @@ struct AssignmentDetailView: View {
         }
         assignment.updatedAt = .now
         PersistentStore.save(context)
+        synchronizeCalendarAfterCompletion()
     }
 
-    private func syncCalendar() async {
+    @MainActor
+    private func synchronizeCalendarAfterCompletion() {
+        Task {
+            do {
+                try await CalendarService.shared.synchronizeAfterAssignmentChange(
+                    assignment,
+                    subjectName: subject?.name
+                )
+                PersistentStore.save(context)
+            } catch {
+                NSLog("StudyFlow 日历同步失败：%@", error.localizedDescription)
+            }
+        }
+    }
+
+    private func performCalendarAction() async {
         isSyncing = true
         defer { isSyncing = false }
+
         do {
-            try await CalendarService.shared.sync(assignment, subjectName: subject?.name)
-            PersistentStore.save(context)
-            notice = "作业已同步到系统日历。"
+            if assignment.calendarEventIdentifier != nil {
+                try CalendarService.shared.removeEvent(for: assignment)
+                PersistentStore.save(context)
+                notice = "已取消这份作业的日历同步。"
+            } else {
+                try await CalendarService.shared.sync(assignment, subjectName: subject?.name)
+                PersistentStore.save(context)
+                notice = "作业已同步到系统日历。"
+            }
         } catch {
             notice = error.localizedDescription
         }

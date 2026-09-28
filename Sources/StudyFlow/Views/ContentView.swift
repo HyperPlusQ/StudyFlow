@@ -104,6 +104,9 @@ struct ContentView: View {
 struct SettingsView: View {
     @Environment(\.modelContext) private var context
 
+    @AppStorage(CalendarService.alwaysSyncDefaultsKey)
+    private var alwaysSyncCalendar = false
+
     @Query private var subjects: [Subject]
     @Query private var assignments: [Assignment]
     @Query private var timeBlocks: [TimeBlock]
@@ -132,7 +135,13 @@ struct SettingsView: View {
             }
 
             Section("系统日历") {
-                Text("在作业详情中可将截止时间添加到 macOS 系统日历；首次同步时会请求日历权限。")
+                Toggle("总是同步到系统日历", isOn: $alwaysSyncCalendar)
+                    .onChange(of: alwaysSyncCalendar) { _, isEnabled in
+                        guard isEnabled else { return }
+                        requestCalendarAccessForAutomaticSync()
+                    }
+
+                Text("打开后会立即请求日历权限。此后新建、编辑或完成作业时会自动创建、更新或删除对应日历事件；已同步作业即使关闭此开关，编辑或完成时仍会更新或删除现有事件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -328,6 +337,17 @@ struct SettingsView: View {
     private func checkForUpdates() async {
         updateState = .checking
         updateState = await GitHubUpdateService.checkForUpdates()
+    }
+
+    private func requestCalendarAccessForAutomaticSync() {
+        Task { @MainActor in
+            do {
+                try await CalendarService.shared.requestAccessForAutomaticSync()
+            } catch {
+                alwaysSyncCalendar = false
+                notice = error.localizedDescription
+            }
+        }
     }
 
     @MainActor
