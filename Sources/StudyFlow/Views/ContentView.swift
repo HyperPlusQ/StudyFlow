@@ -1,6 +1,7 @@
 import Observation
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     static let studyFlowNewAssignment = Notification.Name("StudyFlow.NewAssignment")
@@ -68,6 +69,7 @@ struct ContentView: View {
         .navigationTitle(selection.scope.title)
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
+            WidgetSnapshotService.refresh(context: context)
             await NotificationManager.shared.requestAuthorization()
         }
         .onReceive(
@@ -117,6 +119,8 @@ struct SettingsView: View {
     @State private var updateState: UpdateCheckState = .idle
     @State private var exportNotice: String?
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
+    @State private var isImporting = false
+    @State private var pendingImportURL: URL?
 
     var body: some View {
         Form {
@@ -285,6 +289,12 @@ struct SettingsView: View {
                     } label: {
                         Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
                     }
+
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("导入 JSON…", systemImage: "square.and.arrow.down")
+                    }
                 }
 
                 Text("导出包含科目、作业、子任务、时间块和提交方式历史，可保存到本机或在保存对话框中选择 iCloud 云盘。")
@@ -309,6 +319,37 @@ struct SettingsView: View {
             Button("好") { exportNotice = nil }
         } message: {
             Text(exportNotice ?? "")
+        }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case let .success(urls):
+                pendingImportURL = urls.first
+            case let .failure(error):
+                exportNotice = "无法选择文件：\(error.localizedDescription)"
+            }
+        }
+        .alert(
+            "导入 JSON",
+            isPresented: Binding(
+                get: { pendingImportURL != nil },
+                set: { if !$0 { pendingImportURL = nil } }
+            )
+        ) {
+            Button("取消", role: .cancel) {
+                pendingImportURL = nil
+            }
+            Button("覆盖并导入", role: .destructive) {
+                if let url = pendingImportURL {
+                    importData(from: url)
+                }
+                pendingImportURL = nil
+            }
+        } message: {
+            Text("导入会用文件中的数据覆盖当前科目、作业、子任务、时间块和提交方式记录。")
         }
     }
 
@@ -369,6 +410,25 @@ struct SettingsView: View {
             exportNotice = "导出成功。文件已写入所选位置。"
         } catch {
             exportNotice = "导出失败：\(error.localizedDescription)"
+        }
+    }
+
+    @MainActor
+    private func importData(from url: URL) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            try DataExportService.restore(data: data, into: context)
+            WidgetSnapshotService.refresh(context: context)
+            exportNotice = "导入成功。当前数据已替换为文件内容。"
+        } catch {
+            exportNotice = "导入失败：\(error.localizedDescription)"
         }
     }
 }
