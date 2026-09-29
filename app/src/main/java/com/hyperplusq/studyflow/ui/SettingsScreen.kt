@@ -25,6 +25,7 @@ import androidx.compose.material.icons.outlined.CloudDone
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
@@ -51,6 +52,8 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
     val context = LocalContext.current
     var checking by remember { mutableStateOf(false) }
     val exporting by viewModel.exporting.collectAsState()
+    val importing by viewModel.importing.collectAsState()
+    var pendingImportUri by remember { mutableStateOf<android.net.Uri?>(null) }
 
     val calendarLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
@@ -69,6 +72,10 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json")
     ) { uri -> uri?.let(viewModel::exportJson) }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri -> if (uri != null) pendingImportUri = uri }
 
     Column(
         Modifier
@@ -174,21 +181,28 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
 
         SettingsCard(
             icon = Icons.Outlined.BackupTable,
-            title = "数据导出"
+            title = "导入与导出"
         ) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.End,
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Button(
-                    enabled = !exporting,
+                    enabled = !exporting && !importing,
                     onClick = {
                         exportLauncher.launch(
                             "StudyFlow-${System.currentTimeMillis()}.json"
                         )
                     }
-                ) { Text("选择位置") }
+                ) { Text("导出 JSON") }
+                Button(
+                    enabled = !exporting && !importing,
+                    onClick = { importLauncher.launch(arrayOf("application/json")) }
+                ) { Text("导入 JSON") }
+                if (exporting || importing) {
+                    LinearProgressIndicator(Modifier.weight(1f))
+                }
             }
         }
 
@@ -205,6 +219,24 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
             }
         }
 
+        if (pendingImportUri != null) {
+            AlertDialog(
+                onDismissRequest = { pendingImportUri = null },
+                title = { Text("导入 StudyFlow 数据") },
+                text = { Text("导入会覆盖当前设备上的科目、作业、子任务、时间块和提交方式记录。是否继续？") },
+                confirmButton = {
+                    Button(
+                        onClick = {
+                            pendingImportUri?.let(viewModel::importJson)
+                            pendingImportUri = null
+                        }
+                    ) { Text("继续导入") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { pendingImportUri = null }) { Text("取消") }
+                }
+            )
+        }
     }
 }
 

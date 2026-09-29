@@ -29,6 +29,9 @@ interface SubjectDao {
     @Query("DELETE FROM subjects WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("DELETE FROM subjects")
+    suspend fun deleteAll()
+
     @Query("UPDATE subjects SET parentId = :newParentId WHERE parentId = :oldParentId")
     suspend fun promoteChildren(oldParentId: Long, newParentId: Long?)
 
@@ -81,6 +84,9 @@ interface AssignmentDao {
     @Query("DELETE FROM assignments WHERE id = :id")
     suspend fun delete(id: Long)
 
+    @Query("DELETE FROM assignments")
+    suspend fun deleteAll()
+
     @Query("UPDATE assignments SET status = :status, completedAt = :completedAt, updatedAt = :updatedAt WHERE id = :id")
     suspend fun updateStatus(id: Long, status: Int, completedAt: Long?, updatedAt: Long = System.currentTimeMillis())
 
@@ -98,6 +104,9 @@ interface SubtaskDao {
 
     @Query("DELETE FROM subtasks WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM subtasks")
+    suspend fun deleteAll()
 
     @Query("UPDATE subtasks SET isCompleted = :completed WHERE id = :id")
     suspend fun setCompleted(id: Long, completed: Boolean)
@@ -122,6 +131,9 @@ interface TimeBlockDao {
 
     @Query("DELETE FROM time_blocks WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM time_blocks")
+    suspend fun deleteAll()
 }
 
 @Dao
@@ -148,4 +160,7 @@ interface SubmissionHistoryDao {
 
     @Query("DELETE FROM submission_history WHERE id = :id")
     suspend fun delete(id: Long)
+
+    @Query("DELETE FROM submission_history")
+    suspend fun deleteAll()
 }

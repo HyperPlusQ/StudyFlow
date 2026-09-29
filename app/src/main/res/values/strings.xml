@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">StudyFlow</string>
+    <string name="widget_small_description">显示最近一项进行中的作业</string>
+    <string name="widget_medium_description">显示最近三项进行中的作业</string>
+    <string name="widget_large_description">显示完整的作业概览与进度</string>
 </resources>

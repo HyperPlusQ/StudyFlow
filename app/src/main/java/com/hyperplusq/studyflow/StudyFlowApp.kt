@@ -9,6 +9,7 @@ import com.hyperplusq.studyflow.data.SettingsRepository
 import com.hyperplusq.studyflow.data.StudyRepository
 import com.hyperplusq.studyflow.data.db.AppDatabase
 import com.hyperplusq.studyflow.system.ReminderScheduler
+import com.hyperplusq.studyflow.widget.WidgetUpdater
 
 class StudyFlowApp : Application() {
     lateinit var database: AppDatabase
@@ -25,6 +26,7 @@ class StudyFlowApp : Application() {
         repository = StudyRepository(database)
         settings = SettingsRepository(this)
         scheduleExistingReminders()
+        WidgetUpdater.requestUpdate(this)
     }
 
     private fun scheduleExistingReminders() {

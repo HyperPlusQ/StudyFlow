@@ -10,6 +10,8 @@ import com.hyperplusq.studyflow.data.db.TimeBlockEntity
 import kotlinx.coroutines.flow.Flow
 
 class StudyRepository(private val db: AppDatabase) {
+    internal val database: AppDatabase
+        get() = db
     val subjects: Flow<List<SubjectEntity>> = db.subjectDao().observeAll()
     val assignments: Flow<List<com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks>> =
         db.assignmentDao().observeAllWithSubtasks()

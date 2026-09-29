@@ -18,13 +18,16 @@ import com.hyperplusq.studyflow.data.db.SubtaskEntity
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
 import com.hyperplusq.studyflow.system.CalendarSyncManager
 import com.hyperplusq.studyflow.system.JsonExporter
+import com.hyperplusq.studyflow.system.JsonImporter
 import com.hyperplusq.studyflow.system.ReminderScheduler
+import com.hyperplusq.studyflow.widget.WidgetUpdater
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -56,6 +59,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _exporting = MutableStateFlow(false)
     val exporting: StateFlow<Boolean> = _exporting
+
+    private val _importing = MutableStateFlow(false)
+    val importing: StateFlow<Boolean> = _importing
 
     private var messageJob: Job? = null
 
@@ -179,6 +185,53 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun importJson(uri: Uri) {
+        if (_importing.value || _exporting.value) return
+        _importing.value = true
+        viewModelScope.launch {
+            try {
+                val settings = settingsRepository.settings.first()
+                val summary = JsonImporter.import(
+                    context = getApplication(),
+                    uri = uri,
+                    repository = repository,
+                    beforeReplace = {
+                        repository.allAssignmentsOnce().forEach { assignment ->
+                            ReminderScheduler.cancel(getApplication(), assignment.id)
+                            assignment.calendarEventId?.let {
+                                CalendarSyncManager.deleteEvent(getApplication(), it)
+                            }
+                        }
+                    }
+                )
+                val imported = repository.assignmentsOnce()
+                imported.forEach { item ->
+                    // Imported calendar identifiers are platform-specific and are rebuilt
+                    // after the old events have been removed.
+                    repository.setCalendarEventId(item.assignment.id, null)
+                    if (settings.alwaysSyncCalendar) {
+                        syncCalendarIfPossible(item.assignment, true)
+                    }
+                }
+                if (settings.notificationsEnabled) {
+                    imported.forEach { item ->
+                        if (item.assignment.status != AssignmentStatus.COMPLETED.rawValue) {
+                            ReminderScheduler.schedule(getApplication(), item.assignment)
+                        }
+                    }
+                }
+                WidgetUpdater.requestUpdate(getApplication())
+                announce("导入完成：${summary.assignments} 份作业")
+            } catch (c: CancellationException) {
+                throw c
+            } catch (e: Exception) {
+                announce("导入失败：${e.message ?: "未知错误"}")
+            } finally {
+                _importing.value = false
+            }
+        }
+    }
+
     fun exportJson(uri: Uri) {
         if (_exporting.value) return
         _exporting.value = true
@@ -213,6 +266,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 action()
+                WidgetUpdater.requestUpdate(getApplication())
                 success?.let { announce(it) }
             } catch (c: CancellationException) {
                 throw c
