@@ -2,8 +2,18 @@ import AppKit
 import SwiftData
 import SwiftUI
 
+/// 关闭最后一个窗口后自动退出，避免应用保留在后台却没有可显示的窗口，
+/// 导致下一次点击 Dock 图标时表现为“启动失败”。
+final class StudyFlowAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        true
+    }
+}
+
 @main
 struct StudyFlowApp: App {
+    @NSApplicationDelegateAdaptor(StudyFlowAppDelegate.self) private var appDelegate
+
     let container: ModelContainer
 
     init() {
