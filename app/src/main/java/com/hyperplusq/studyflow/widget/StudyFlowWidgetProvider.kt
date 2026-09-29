@@ -6,6 +6,7 @@ import android.appwidget.AppWidgetProvider
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.widget.RemoteViews
 import com.hyperplusq.studyflow.R
 import com.hyperplusq.studyflow.ui.MainActivity
@@ -15,6 +16,10 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 
 abstract class StudyFlowWidgetProvider : AppWidgetProvider() {
+    private companion object {
+        const val TAG = "StudyFlowWidget"
+    }
+
     protected abstract val layoutRes: Int
     protected abstract val maxItems: Int
 
@@ -31,6 +36,20 @@ abstract class StudyFlowWidgetProvider : AppWidgetProvider() {
                     appWidgetManager.updateAppWidget(
                         id,
                         buildViews(context, id, snapshot)
+                    )
+                }
+            } catch (error: Exception) {
+                Log.e(TAG, "无法更新 StudyFlow 小组件", error)
+                val emptySnapshot = WidgetSnapshot(
+                    activeCount = 0,
+                    dueTodayCount = 0,
+                    overdueCount = 0,
+                    items = emptyList()
+                )
+                appWidgetIds.forEach { id ->
+                    appWidgetManager.updateAppWidget(
+                        id,
+                        buildViews(context, id, emptySnapshot)
                     )
                 }
             } finally {
@@ -52,7 +71,7 @@ abstract class StudyFlowWidgetProvider : AppWidgetProvider() {
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
             )
-            setImageViewResource(R.id.widget_icon, R.mipmap.ic_launcher)
+            setImageViewResource(R.id.widget_icon, R.drawable.ic_launcher)
             setTextViewText(
                 R.id.widget_title,
                 context.getString(com.hyperplusq.studyflow.R.string.app_name)

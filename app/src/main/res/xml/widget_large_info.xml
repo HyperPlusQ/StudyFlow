@@ -8,4 +8,5 @@
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen"
     android:initialLayout="@layout/widget_large_4x4"
+    android:previewLayout="@layout/widget_large_4x4"
     android:description="@string/widget_large_description" />
