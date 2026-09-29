@@ -195,7 +195,6 @@ enum DataExportService {
         }
 
         try context.save()
-        WidgetSnapshotService.refresh(context: context)
 
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach {
             NotificationManager.shared.schedule(for: $0)

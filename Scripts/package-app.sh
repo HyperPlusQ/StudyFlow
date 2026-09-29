@@ -22,7 +22,6 @@ cleanup() {
 trap cleanup EXIT
 
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
-plutil -lint "$APP/Contents/PlugIns/StudyFlowWidget.appex/Contents/Info.plist" >/dev/null
 codesign --verify --deep --strict --verbose=2 "$APP"
 
 # Use zip directly. ditto --sequesterRsrc creates a second, invalid
@@ -44,9 +43,7 @@ unzip -q "$ZIP" -d "$VERIFY_DIR"
 
 EXTRACTED="$VERIFY_DIR/StudyFlow.app"
 test -x "$EXTRACTED/Contents/MacOS/StudyFlow"
-test -x "$EXTRACTED/Contents/PlugIns/StudyFlowWidget.appex/Contents/MacOS/StudyFlowWidget"
 plutil -lint "$EXTRACTED/Contents/Info.plist" >/dev/null
-plutil -lint "$EXTRACTED/Contents/PlugIns/StudyFlowWidget.appex/Contents/Info.plist" >/dev/null
 codesign --verify --deep --strict --verbose=2 "$EXTRACTED"
 
 echo "Packaged: $ZIP"

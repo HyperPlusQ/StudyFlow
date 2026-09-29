@@ -69,7 +69,6 @@ struct ContentView: View {
         .navigationTitle(selection.scope.title)
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
-            WidgetSnapshotService.refresh(context: context)
             await NotificationManager.shared.requestAuthorization()
         }
         .onReceive(
@@ -425,7 +424,6 @@ struct SettingsView: View {
         do {
             let data = try Data(contentsOf: url)
             try DataExportService.restore(data: data, into: context)
-            WidgetSnapshotService.refresh(context: context)
             exportNotice = "导入成功。当前数据已替换为文件内容。"
         } catch {
             exportNotice = "导入失败：\(error.localizedDescription)"
