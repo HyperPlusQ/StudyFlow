@@ -28,6 +28,9 @@ struct ContentView: View {
     @State private var showNewTimeBlock = false
     @State private var showSettings = false
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
+    #if os(iOS)
+    @State private var iosTab: IOSTab = .dashboard
+    #endif
 
     init(
         exporter: (any StudyFlowDataExporter)? = nil,
@@ -38,58 +41,64 @@ struct ContentView: View {
     }
 
     var body: some View {
-        NavigationSplitView {
-            SidebarView(
-                selection: $selection,
-                subjects: subjects,
-                assignments: assignments,
-                onNewAssignment: { showNewAssignment = true },
-                onNewSubject: { parent in
-                    newSubjectParent = parent
-                    editingSubject = nil
-                    showNewSubject = true
-                },
-                onEditSubject: { subject in
-                    editingSubject = subject
-                    newSubjectParent = nil
-                    showNewSubject = true
-                }
-            )
-            .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
-        } detail: {
-            Group {
-                if selection.scope == .dashboard {
-                    DashboardView(
-                        assignments: assignments,
-                        subjects: subjects,
-                        blocks: blocks,
-                        onNewBlock: { showNewTimeBlock = true }
-                    )
-                } else {
-                    AssignmentListView(
-                        scope: selection,
-                        assignments: assignments,
-                        subjects: subjects,
-                        blocks: blocks,
-                        filter: $filter,
-                        onNewAssignment: { showNewAssignment = true }
-                    )
+        Group {
+            #if os(iOS)
+            iosTabView
+            #else
+            NavigationSplitView {
+                SidebarView(
+                    selection: $selection,
+                    subjects: subjects,
+                    assignments: assignments,
+                    onNewAssignment: { showNewAssignment = true },
+                    onNewSubject: { parent in
+                        newSubjectParent = parent
+                        editingSubject = nil
+                        showNewSubject = true
+                    },
+                    onEditSubject: { subject in
+                        editingSubject = subject
+                        newSubjectParent = nil
+                        showNewSubject = true
+                    }
+                )
+                .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
+            } detail: {
+                Group {
+                    if selection.scope == .dashboard {
+                        DashboardView(
+                            assignments: assignments,
+                            subjects: subjects,
+                            blocks: blocks,
+                            onNewBlock: { showNewTimeBlock = true }
+                        )
+                    } else {
+                        AssignmentListView(
+                            scope: selection,
+                            assignments: assignments,
+                            subjects: subjects,
+                            blocks: blocks,
+                            filter: $filter,
+                            onNewAssignment: { showNewAssignment = true }
+                        )
+                    }
                 }
             }
+            .platformTransparentToolbar()
+            .navigationTitle(selection.scope.title)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showSettings = true
+                    } label: {
+                        SafeSystemImage(systemName: "gearshape", fallback: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("设置")
+                }
+            }
+            #endif
         }
         .background { StudyFlowBackdrop().ignoresSafeArea() }
-        .platformTransparentToolbar()
-        .navigationTitle(selection.scope.title)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showSettings = true
-                } label: {
-                    SafeSystemImage(systemName: "gearshape", fallback: "ellipsis.circle")
-                }
-                .accessibilityLabel("设置")
-            }
-        }
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
             await NotificationManager.shared.requestAuthorization()
@@ -128,6 +137,79 @@ struct ContentView: View {
             }
         }
     }
+
+    #if os(iOS)
+    /// The iOS shell mirrors the Android application's page-oriented layout:
+    /// five top-level destinations switch through a native `TabView`, whose
+    /// system tab bar adopts Liquid Glass on supported releases.
+    private var iosTabView: some View {
+        TabView(selection: $iosTab) {
+            NavigationStack {
+                DashboardView(
+                    assignments: assignments,
+                    subjects: subjects,
+                    blocks: blocks,
+                    onNewBlock: { showNewTimeBlock = true }
+                )
+            }
+            .tabItem { Label("概览", systemImage: "chart.bar.xaxis") }
+            .tag(IOSTab.dashboard)
+
+            NavigationStack {
+                IOSAssignmentsPage(
+                    assignments: assignments,
+                    subjects: subjects,
+                    blocks: blocks,
+                    filter: $filter,
+                    onNewAssignment: { showNewAssignment = true }
+                )
+            }
+            .tabItem { Label("作业", systemImage: "list.bullet.rectangle") }
+            .tag(IOSTab.assignments)
+
+            NavigationStack {
+                ScheduleView(
+                    blocks: blocks,
+                    subjects: subjects,
+                    onNewBlock: { showNewTimeBlock = true }
+                )
+            }
+            .tabItem { Label("日程", systemImage: "calendar") }
+            .tag(IOSTab.schedule)
+
+            NavigationStack {
+                SubjectsView(
+                    selection: $selection,
+                    subjects: subjects,
+                    assignments: assignments,
+                    onNewSubject: {
+                        newSubjectParent = nil
+                        editingSubject = nil
+                        showNewSubject = true
+                    },
+                    onEditSubject: { subject in
+                        editingSubject = subject
+                        newSubjectParent = nil
+                        showNewSubject = true
+                    }
+                )
+            }
+            .tabItem { Label("科目", systemImage: "books.vertical") }
+            .tag(IOSTab.subjects)
+
+            NavigationStack {
+                SettingsView(
+                    exporter: exporter,
+                    cloudFolderProvider: cloudFolderProvider
+                )
+            }
+            .tabItem { Label("设置", systemImage: "gearshape") }
+            .tag(IOSTab.settings)
+        }
+        .tint(.accentColor)
+        .tabViewStyle(.automatic)
+    }
+    #endif
 }
 
 struct SettingsView: View {
