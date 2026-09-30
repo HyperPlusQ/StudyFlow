@@ -91,7 +91,7 @@ struct AssignmentListView: View {
                 .accessibilityLabel("筛选")
                 .popover(isPresented: $showFilters, arrowEdge: .bottom) {
                     FilterPopover(filter: $filter, subjects: subjects)
-                        .frame(width: 340)
+                        .frame(maxWidth: 340)
                 }
                 Button(action: onNewAssignment) {
                     SafeSystemImage(systemName: "plus", fallback: "circle")
@@ -100,25 +100,52 @@ struct AssignmentListView: View {
                 .keyboardShortcut("n", modifiers: [.command])
             }
         }
+        #if os(iOS)
+        .sheet(isPresented: Binding(
+            get: { selectedAssignmentId != nil },
+            set: { if !$0 { selectedAssignmentId = nil } }
+        )) {
+            NavigationStack {
+                assignmentDetailContent
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("完成") { selectedAssignmentId = nil }
+                        }
+                    }
+            }
+            .presentationDetents([.large])
+            .presentationContentInteraction(.scrolls)
+        }
+        #else
         .inspector(isPresented: Binding(
             get: { selectedAssignmentId != nil },
             set: { if !$0 { selectedAssignmentId = nil } }
         )) {
-            if let id = selectedAssignmentId, let assignment = assignments.first(where: { $0.id == id }) {
-                AssignmentDetailView(
-                    assignment: assignment,
-                    subjects: subjects,
-                    blocks: blocks,
-                    onEdit: { editingAssignment = assignment; selectedAssignmentId = nil },
-                    onSchedule: { schedulingAssignment = assignment }
-                )
+            assignmentDetailContent
                 .inspectorColumnWidth(min: 340, ideal: 390, max: 460)
-            } else {
-                ContentUnavailableView("未选择作业", systemImage: "sidebar.left")
-            }
         }
+        #endif
         .sheet(item: $editingAssignment) { AssignmentEditorView(mode: .edit($0), subjects: subjects) }
         .sheet(item: $schedulingAssignment) { TimeBlockEditorView(subjects: subjects, assignment: $0) }
+    }
+
+    @ViewBuilder
+    private var assignmentDetailContent: some View {
+        if let id = selectedAssignmentId,
+           let assignment = assignments.first(where: { $0.id == id }) {
+            AssignmentDetailView(
+                assignment: assignment,
+                subjects: subjects,
+                blocks: blocks,
+                onEdit: {
+                    editingAssignment = assignment
+                    selectedAssignmentId = nil
+                },
+                onSchedule: { schedulingAssignment = assignment }
+            )
+        } else {
+            ContentUnavailableView("未选择作业", systemImage: "sidebar.left")
+        }
     }
 
     @ViewBuilder
@@ -150,11 +177,11 @@ struct AssignmentListView: View {
                                 subject: taskSubject,
                                 rank: rankValue,
                                 onToggle: { toggleComplete(task) },
+                                onOpen: { selectedAssignmentId = task.id },
                                 onEdit: { editingAssignment = task },
                                 onSchedule: { schedulingAssignment = task }
                             )
                             .tag(task.id)
-                            .onTapGesture { selectedAssignmentId = task.id }
                         }
                     } header: {
                         Label(
@@ -207,6 +234,24 @@ struct AssignmentListView: View {
         }
         assignment.updatedAt = .now
         PersistentStore.save(context)
+        synchronizeCalendarAfterCompletion(for: assignment)
+    }
+
+    @MainActor
+    private func synchronizeCalendarAfterCompletion(for assignment: Assignment) {
+        let subjectName = assignment.subjectId.flatMap { subjectMap[$0]?.name }
+
+        Task {
+            do {
+                try await CalendarService.shared.synchronizeAfterAssignmentChange(
+                    assignment,
+                    subjectName: subjectName
+                )
+                PersistentStore.save(context)
+            } catch {
+                NSLog("StudyFlow 日历同步失败：%@", error.localizedDescription)
+            }
+        }
     }
 }
 
@@ -215,6 +260,7 @@ struct AssignmentRow: View {
     let subject: Subject?
     var rank: Int?
     let onToggle: () -> Void
+    let onOpen: () -> Void
     let onEdit: () -> Void
     let onSchedule: () -> Void
 
@@ -269,6 +315,9 @@ struct AssignmentRow: View {
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
+        #if os(iOS)
+        .onTapGesture(perform: onOpen)
+        #endif
         .contextMenu {
             Button(assignment.isCompleted ? "恢复进行中" : "标记为已完成", action: onToggle)
             Button("编辑…", action: onEdit)

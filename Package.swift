@@ -4,23 +4,21 @@ import PackageDescription
 let package = Package(
     name: "StudyFlow",
     platforms: [
-        .macOS(.v14),
         .iOS(.v17)
     ],
     products: [
         .library(name: "StudyFlowKit", targets: ["StudyFlowKit"]),
-        .executable(name: "StudyFlow", targets: ["StudyFlowMacOS"])
+        .library(name: "StudyFlowWidgetShared", targets: ["StudyFlowWidgetShared"])
     ],
     targets: [
         .target(
-            name: "StudyFlowKit",
-            path: "Sources/StudyFlowKit"
+            name: "StudyFlowWidgetShared",
+            path: "Sources/StudyFlowWidgetShared"
         ),
-        .executableTarget(
-            name: "StudyFlowMacOS",
-            dependencies: ["StudyFlowKit"],
-            path: "Sources/StudyFlowMacOS",
-            resources: [.process("Resources")]
+        .target(
+            name: "StudyFlowKit",
+            dependencies: ["StudyFlowWidgetShared"],
+            path: "Sources/StudyFlowKit"
         ),
         .testTarget(
             name: "StudyFlowKitTests",

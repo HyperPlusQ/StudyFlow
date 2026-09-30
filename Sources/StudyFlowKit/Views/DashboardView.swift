@@ -58,11 +58,19 @@ struct DashboardView: View {
             VStack(alignment: .leading, spacing: 24) {
                 header
                 statsGrid
-                HStack(alignment: .top, spacing: 20) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 320), spacing: 20)],
+                    alignment: .leading,
+                    spacing: 20
+                ) {
                     timeDistribution
                     completionChart
                 }
-                HStack(alignment: .top, spacing: 20) {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: 320), spacing: 20)],
+                    alignment: .leading,
+                    spacing: 20
+                ) {
                     upcomingFocus
                     schedulePreview
                 }

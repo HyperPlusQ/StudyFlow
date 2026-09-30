@@ -28,6 +28,15 @@ public enum StudyFlowStorage {
     }
 }
 
+/// Lets an application shell refresh widget data without importing the
+/// widget-shared target directly.
+@MainActor
+public enum StudyFlowWidgetBridge {
+    public static func refresh(context: ModelContext) {
+        WidgetSnapshotService.refresh(context: context)
+    }
+}
+
 /// Platform-neutral entry point for the shared StudyFlow feature shell.
 @MainActor
 public struct StudyFlowRootView: View {

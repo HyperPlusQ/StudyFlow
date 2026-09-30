@@ -95,7 +95,7 @@ struct SubjectEditorView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(existing == nil ? "新建科目" : "编辑科目")
-            .frame(width: 520, height: 620)
+            .platformSheetFrame(width: 520, height: 620)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

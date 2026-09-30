@@ -57,6 +57,10 @@ final class ICloudSyncCoordinator {
         String(format: "每天 %02d:%02d", syncHour, syncMinute)
     }
 
+    var hasSelectedFolder: Bool {
+        folderBookmark != nil
+    }
+
     func configure(folderProvider: (any StudyFlowCloudFolderProvider)?) {
         self.folderProvider = folderProvider
     }
@@ -109,6 +113,33 @@ final class ICloudSyncCoordinator {
             return false
         }
     }
+
+    #if os(iOS)
+    /// Persists a folder selected through SwiftUI's native document picker.
+    @discardableResult
+    func setFolder(url: URL, context: ModelContext) -> Bool {
+        do {
+            let bookmark = try url.bookmarkData(
+                options: [],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+            defaults.set(bookmark, forKey: Key.bookmark)
+            folderName = url.lastPathComponent
+            defaults.set(folderName, forKey: Key.folderName)
+            lastMessage = "同步文件夹已更新。"
+            defaults.set(lastMessage, forKey: Key.lastMessage)
+            if isEnabled {
+                synchronize(context: context)
+            }
+            return true
+        } catch {
+            lastMessage = "无法保存同步文件夹访问权限：\(error.localizedDescription)"
+            defaults.set(lastMessage, forKey: Key.lastMessage)
+            return false
+        }
+    }
+    #endif
 
     func setSyncTime(hour: Int, minute: Int) {
         syncHour = min(max(hour, 0), 23)

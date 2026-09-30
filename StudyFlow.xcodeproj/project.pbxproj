@@ -1,0 +1,498 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		800000000000000000000082 /* StudyFlowWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 800000000000000000000005 /* StudyFlowWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		800000000000000000000091 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 800000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 800000000000000000000011;
+			remoteInfo = StudyFlowWidgets;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		800000000000000000000033 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				800000000000000000000082 /* StudyFlowWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		800000000000000000000004 /* StudyFlow.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = StudyFlow.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		800000000000000000000005 /* StudyFlowWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = StudyFlowWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		800000000000000000000093 /* StudyFlow-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "StudyFlow-Info.plist"; sourceTree = "<group>"; };
+		800000000000000000000094 /* StudyFlowWidgets-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "StudyFlowWidgets-Info.plist"; sourceTree = "<group>"; };
+		800000000000000000000095 /* StudyFlow.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StudyFlow.entitlements; sourceTree = "<group>"; };
+		800000000000000000000096 /* StudyFlowWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = StudyFlowWidgets.entitlements; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		800000000000000000000020 /* StudyFlowiOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = Sources/StudyFlowiOS;
+			sourceTree = "<group>";
+		};
+		800000000000000000000021 /* StudyFlowWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = Sources/StudyFlowWidgets;
+			sourceTree = "<group>";
+		};
+		800000000000000000000022 /* StudyFlowKit */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = Sources/StudyFlowKit;
+			sourceTree = "<group>";
+		};
+		800000000000000000000023 /* StudyFlowWidgetShared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+			);
+			path = Sources/StudyFlowWidgetShared;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		800000000000000000000031 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		800000000000000000000041 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		800000000000000000000002 = {
+			isa = PBXGroup;
+			children = (
+				800000000000000000000020 /* StudyFlowiOS */,
+				800000000000000000000021 /* StudyFlowWidgets */,
+				800000000000000000000022 /* StudyFlowKit */,
+				800000000000000000000023 /* StudyFlowWidgetShared */,
+				800000000000000000000097 /* Configuration */,
+				800000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		800000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				800000000000000000000004 /* StudyFlow.app */,
+				800000000000000000000005 /* StudyFlowWidgets.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		800000000000000000000097 /* Configuration */ = {
+			isa = PBXGroup;
+			children = (
+				800000000000000000000093 /* StudyFlow-Info.plist */,
+				800000000000000000000094 /* StudyFlowWidgets-Info.plist */,
+				800000000000000000000095 /* StudyFlow.entitlements */,
+				800000000000000000000096 /* StudyFlowWidgets.entitlements */,
+			);
+			path = Configuration;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		800000000000000000000010 /* StudyFlow */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 800000000000000000000061 /* Build configuration list for PBXNativeTarget "StudyFlow" */;
+			buildPhases = (
+				800000000000000000000030 /* Sources */,
+				800000000000000000000031 /* Frameworks */,
+				800000000000000000000032 /* Resources */,
+				800000000000000000000033 /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				800000000000000000000090 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				800000000000000000000020 /* StudyFlowiOS */,
+				800000000000000000000022 /* StudyFlowKit */,
+				800000000000000000000023 /* StudyFlowWidgetShared */,
+			);
+			name = StudyFlow;
+			productName = StudyFlow;
+			productReference = 800000000000000000000004 /* StudyFlow.app */;
+			productType = "com.apple.product-type.application";
+		};
+		800000000000000000000011 /* StudyFlowWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 800000000000000000000062 /* Build configuration list for PBXNativeTarget "StudyFlowWidgets" */;
+			buildPhases = (
+				800000000000000000000040 /* Sources */,
+				800000000000000000000041 /* Frameworks */,
+				800000000000000000000042 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				800000000000000000000021 /* StudyFlowWidgets */,
+				800000000000000000000023 /* StudyFlowWidgetShared */,
+			);
+			name = StudyFlowWidgets;
+			productName = StudyFlowWidgets;
+			productReference = 800000000000000000000005 /* StudyFlowWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		800000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1700;
+				LastUpgradeCheck = 1700;
+				TargetAttributes = {
+					800000000000000000000010 = {
+						CreatedOnToolsVersion = 17.0;
+					};
+					800000000000000000000011 = {
+						CreatedOnToolsVersion = 17.0;
+					};
+				};
+			};
+			buildConfigurationList = 800000000000000000000060 /* Build configuration list for PBXProject "StudyFlow" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = zh_CN;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				zh_CN,
+				Base,
+			);
+			mainGroup = 800000000000000000000002;
+			productRefGroup = 800000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				800000000000000000000010 /* StudyFlow */,
+				800000000000000000000011 /* StudyFlowWidgets */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		800000000000000000000032 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		800000000000000000000042 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		800000000000000000000030 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		800000000000000000000040 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		800000000000000000000090 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 800000000000000000000011 /* StudyFlowWidgets */;
+			targetProxy = 800000000000000000000091 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		800000000000000000000050 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		800000000000000000000051 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		800000000000000000000052 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlow.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/StudyFlow-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		800000000000000000000053 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlow.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/StudyFlow-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		800000000000000000000054 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlowWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/StudyFlowWidgets-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow.StudyFlowWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		800000000000000000000055 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlowWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "Configuration/StudyFlowWidgets-Info.plist";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.5.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow.StudyFlowWidgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		800000000000000000000060 /* Build configuration list for PBXProject "StudyFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				800000000000000000000050 /* Debug */,
+				800000000000000000000051 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		800000000000000000000061 /* Build configuration list for PBXNativeTarget "StudyFlow" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				800000000000000000000052 /* Debug */,
+				800000000000000000000053 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		800000000000000000000062 /* Build configuration list for PBXNativeTarget "StudyFlowWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				800000000000000000000054 /* Debug */,
+				800000000000000000000055 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+
+	};
+	rootObject = 800000000000000000000001 /* Project object */;
+}

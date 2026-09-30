@@ -1,6 +1,7 @@
 import Observation
 import SwiftData
 import SwiftUI
+import UniformTypeIdentifiers
 
 extension Notification.Name {
     static let studyFlowNewAssignment = Notification.Name("StudyFlow.NewAssignment")
@@ -25,6 +26,7 @@ struct ContentView: View {
     @State private var newSubjectParent: Subject?
     @State private var editingSubject: Subject?
     @State private var showNewTimeBlock = false
+    @State private var showSettings = false
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
 
     init(
@@ -78,6 +80,16 @@ struct ContentView: View {
         .background { StudyFlowBackdrop().ignoresSafeArea() }
         .platformTransparentToolbar()
         .navigationTitle(selection.scope.title)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showSettings = true
+                } label: {
+                    SafeSystemImage(systemName: "gearshape", fallback: "ellipsis.circle")
+                }
+                .accessibilityLabel("设置")
+            }
+        }
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
             await NotificationManager.shared.requestAuthorization()
@@ -110,6 +122,11 @@ struct ContentView: View {
         .sheet(isPresented: $showNewTimeBlock) {
             TimeBlockEditorView(subjects: subjects)
         }
+        .sheet(isPresented: $showSettings) {
+            NavigationStack {
+                StudyFlowSettingsView()
+            }
+        }
     }
 }
 
@@ -123,6 +140,15 @@ struct SettingsView: View {
     @State private var updateState: UpdateCheckState = .idle
     @State private var exportNotice: String?
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
+    @AppStorage(CalendarService.alwaysSyncDefaultsKey) private var alwaysSyncCalendar = false
+    @State private var isImporting = false
+    @State private var pendingImportURL: URL?
+    #if os(iOS)
+    @State private var isChoosingCloudFolder = false
+    @State private var pendingFolderEnable = false
+    @State private var isExporting = false
+    @State private var exportDocument: JSONFileDocument?
+    #endif
 
     init(
         exporter: (any StudyFlowDataExporter)? = nil,
@@ -149,7 +175,13 @@ struct SettingsView: View {
             }
 
             Section("系统日历") {
-                Text("在作业详情中可将截止时间添加到 macOS 系统日历；首次同步时会请求日历权限。")
+                Toggle("总是同步到系统日历", isOn: $alwaysSyncCalendar)
+                    .onChange(of: alwaysSyncCalendar) { _, isEnabled in
+                        guard isEnabled else { return }
+                        requestCalendarAccessForAutomaticSync()
+                    }
+
+                Text("打开后会立即请求日历权限。此后新建、编辑或完成作业时会自动创建、更新或删除对应日历事件；已同步作业即使关闭此开关，编辑或完成时仍会更新或删除现有事件。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -206,6 +238,18 @@ struct SettingsView: View {
                     isOn: Binding(
                         get: { syncCoordinator.isEnabled },
                         set: { enabled in
+                            if enabled && !syncCoordinator.hasSelectedFolder {
+                                pendingFolderEnable = true
+                                #if os(iOS)
+                                isChoosingCloudFolder = true
+                                #else
+                                if !syncCoordinator.setEnabled(enabled, context: context) {
+                                    notice = "未选择同步文件夹，自动同步保持关闭。"
+                                }
+                                pendingFolderEnable = false
+                                #endif
+                                return
+                            }
                             if !syncCoordinator.setEnabled(enabled, context: context) {
                                 notice = "未选择同步文件夹，自动同步保持关闭。"
                             }
@@ -257,12 +301,19 @@ struct SettingsView: View {
 
                 HStack {
                     Button {
+                        #if os(iOS)
+                        isChoosingCloudFolder = true
+                        pendingFolderEnable = false
+                        #else
                         syncCoordinator.chooseFolder(context: context)
+                        #endif
                     } label: {
-                        Label("更改同步文件夹…", systemImage: "folder")
+                        Label(syncCoordinator.hasSelectedFolder ? "更改同步文件夹…" : "选择同步文件夹…", systemImage: "folder")
                     }
                     .studyFlowGlassButtonStyle()
+                    #if os(macOS)
                     .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
+                    #endif
 
                     Button {
                         syncCoordinator.synchronize(context: context)
@@ -270,7 +321,7 @@ struct SettingsView: View {
                         Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
                     }
                     .studyFlowGlassButtonStyle(prominent: true)
-                    .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
+                    .disabled(!syncCoordinator.isEnabled || !syncCoordinator.hasSelectedFolder)
 
                     Spacer()
                 }
@@ -285,6 +336,21 @@ struct SettingsView: View {
                 LabeledContent("云盘备份") { Text("iCloud 云盘 JSON 导出") }
 
                 HStack {
+                    #if os(iOS)
+                    Button {
+                        exportData(to: .anywhere)
+                    } label: {
+                        Label("导出 JSON…", systemImage: "square.and.arrow.up")
+                    }
+                    .studyFlowGlassButtonStyle()
+
+                    Button {
+                        exportData(to: .iCloudDrive)
+                    } label: {
+                        Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
+                    }
+                    .studyFlowGlassButtonStyle(prominent: true)
+                    #else
                     Button {
                         exportData(to: .anywhere)
                     } label: {
@@ -300,21 +366,29 @@ struct SettingsView: View {
                     }
                     .studyFlowGlassButtonStyle(prominent: true)
                     .disabled(exporter == nil)
+                    #endif
+
+                    Button {
+                        isImporting = true
+                    } label: {
+                        Label("导入 JSON…", systemImage: "square.and.arrow.down")
+                    }
+                    .studyFlowGlassButtonStyle()
                 }
 
-                if exporter == nil {
-                    Text("当前平台尚未配置 JSON 导出器。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                Text("导出包含科目、作业、子任务、时间块和提交方式历史，可保存到本机或在保存对话框中选择 iCloud 云盘。")
+                Text("导出包含科目、作业、子任务、时间块和提交方式历史；导入会用所选 JSON 覆盖当前数据。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+
+            Section("关于") {
+                LabeledContent("作者") {
+                    Text("HyperPlus")
+                }
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 560, height: 760)
+        .platformSheetFrame(width: 560, height: 760)
         .alert("设置", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("好") { notice = nil }
         } message: {
@@ -325,7 +399,97 @@ struct SettingsView: View {
         } message: {
             Text(exportNotice ?? "")
         }
+        .fileImporter(
+            isPresented: $isImporting,
+            allowedContentTypes: [.json],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case let .success(urls):
+                pendingImportURL = urls.first
+            case let .failure(error):
+                exportNotice = "无法选择文件：\(error.localizedDescription)"
+            }
+        }
+        .alert(
+            "导入 JSON",
+            isPresented: Binding(
+                get: { pendingImportURL != nil },
+                set: { if !$0 { pendingImportURL = nil } }
+            )
+        ) {
+            Button("取消", role: .cancel) {
+                pendingImportURL = nil
+            }
+            Button("覆盖并导入", role: .destructive) {
+                if let url = pendingImportURL {
+                    importData(from: url)
+                }
+                pendingImportURL = nil
+            }
+        } message: {
+            Text("导入会用文件中的数据覆盖当前科目、作业、子任务、时间块和提交方式记录。")
+        }
+        #if os(iOS)
+        .fileImporter(
+            isPresented: $isChoosingCloudFolder,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            switch result {
+            case let .success(urls):
+                if let url = urls.first {
+                    setCloudFolder(url)
+                }
+            case let .failure(error):
+                pendingFolderEnable = false
+                notice = "无法选择同步文件夹：\(error.localizedDescription)"
+            }
+        }
+        .fileExporter(
+            isPresented: $isExporting,
+            document: exportDocument,
+            contentType: .json,
+            defaultFilename: DataExportService.suggestedFileName()
+        ) { result in
+            switch result {
+            case .success:
+                exportNotice = "导出成功。文件已保存到所选位置。"
+            case let .failure(error):
+                if (error as? CocoaError)?.code == .userCancelled {
+                    exportNotice = "已取消导出。"
+                } else {
+                    exportNotice = "导出失败：\(error.localizedDescription)"
+                }
+            }
+        }
+        #endif
     }
+
+    private func requestCalendarAccessForAutomaticSync() {
+        Task { @MainActor in
+            do {
+                try await CalendarService.shared.requestAccessForAutomaticSync()
+            } catch {
+                alwaysSyncCalendar = false
+                notice = error.localizedDescription
+            }
+        }
+    }
+
+    #if os(iOS)
+    private func setCloudFolder(_ url: URL) {
+        defer { pendingFolderEnable = false }
+        guard syncCoordinator.setFolder(url: url, context: context) else {
+            notice = syncCoordinator.lastMessage
+            return
+        }
+
+        if pendingFolderEnable, !syncCoordinator.setEnabled(true, context: context) {
+            notice = syncCoordinator.lastMessage
+        }
+    }
+    #endif
 
     private var updateStatusText: String {
         switch updateState {
@@ -362,13 +526,16 @@ struct SettingsView: View {
 
     @MainActor
     private func exportData(to destination: DataExportService.Destination) {
-        guard let exporter else {
-            exportNotice = "当前平台尚未配置 JSON 导出器。"
-            return
-        }
-
         do {
             let data = try DataExportService.currentData(context: context)
+            #if os(iOS)
+            exportDocument = JSONFileDocument(data: data)
+            isExporting = true
+            #else
+            guard let exporter else {
+                exportNotice = "当前平台尚未配置 JSON 导出器。"
+                return
+            }
             let didSave = try exporter.export(
                 data: data,
                 suggestedFileName: DataExportService.suggestedFileName(),
@@ -379,10 +546,47 @@ struct SettingsView: View {
             } else {
                 exportNotice = "已取消导出。"
             }
-        } catch is CocoaError {
-            exportNotice = "已取消导出。"
+            #endif
         } catch {
             exportNotice = "导出失败：\(error.localizedDescription)"
         }
     }
+
+    @MainActor
+    private func importData(from url: URL) {
+        let accessing = url.startAccessingSecurityScopedResource()
+        defer {
+            if accessing {
+                url.stopAccessingSecurityScopedResource()
+            }
+        }
+
+        do {
+            let data = try Data(contentsOf: url)
+            try DataExportService.restore(data: data, into: context)
+            exportNotice = "导入成功。当前数据已替换为文件内容。"
+        } catch {
+            exportNotice = "导入失败：\(error.localizedDescription)"
+        }
+    }
 }
+
+#if os(iOS)
+struct JSONFileDocument: FileDocument {
+    static var readableContentTypes: [UTType] { [.json] }
+
+    var data: Data
+
+    init(data: Data) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
+    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
+        FileWrapper(regularFileWithContents: data)
+    }
+}
+#endif

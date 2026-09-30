@@ -207,7 +207,7 @@ struct AssignmentEditorView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(modeTitle)
-            .frame(minWidth: 560, minHeight: 640)
+            .platformSheetFrame(width: 560, height: 640)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
@@ -272,7 +272,27 @@ struct AssignmentEditorView: View {
         reconcileSubtasks(for: assignment)
         PersistentStore.save(context)
         NotificationManager.shared.schedule(for: assignment)
+        synchronizeCalendarAfterSave(for: assignment)
         dismiss()
+    }
+
+    @MainActor
+    private func synchronizeCalendarAfterSave(for assignment: Assignment) {
+        let subjectName = assignment.subjectId.flatMap { id in
+            subjects.first { $0.id == id }?.name
+        }
+
+        Task {
+            do {
+                try await CalendarService.shared.synchronizeAfterAssignmentChange(
+                    assignment,
+                    subjectName: subjectName
+                )
+                PersistentStore.save(context)
+            } catch {
+                NSLog("StudyFlow 日历同步失败：%@", error.localizedDescription)
+            }
+        }
     }
 
     private func reconcileSubtasks(for assignment: Assignment) {

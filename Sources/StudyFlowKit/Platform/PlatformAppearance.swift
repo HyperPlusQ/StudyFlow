@@ -178,6 +178,20 @@ extension View {
 }
 
 extension View {
+    /// Uses a fixed native sheet size on macOS and a full-screen adaptive
+    /// detent on iOS so the same editor works on every screen ratio.
+    @ViewBuilder
+    func platformSheetFrame(width: CGFloat, height: CGFloat) -> some View {
+        #if os(iOS)
+        self
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .presentationDetents([.large])
+            .presentationContentInteraction(.scrolls)
+        #else
+        self.frame(width: width, height: height)
+        #endif
+    }
+
     /// `.help` is a macOS presentation affordance; keeping the call behind a
     /// shared helper prevents the shared target from depending on AppKit.
     @ViewBuilder

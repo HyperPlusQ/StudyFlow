@@ -13,5 +13,6 @@ enum PersistentStore {
             return
         }
         ICloudSyncCoordinator.shared.refreshLocalSnapshotIfNeeded(context: context)
+        WidgetSnapshotService.refresh(context: context)
     }
 }
