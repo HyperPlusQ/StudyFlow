@@ -9,6 +9,7 @@ import android.util.Patterns
 enum class SubmissionKind { URL, EMAIL, OTHER }
 
 object SubmissionLink {
+    /** 识别提交方式是网址、邮箱还是普通文本。 */
     fun classify(value: String): SubmissionKind {
         val text = value.trim()
         return when {
@@ -20,6 +21,7 @@ object SubmissionLink {
         }
     }
 
+    /** 用系统浏览器或邮件应用打开提交方式。 */
     fun open(context: Context, value: String): Boolean {
         val text = value.trim()
         if (text.isBlank()) return false

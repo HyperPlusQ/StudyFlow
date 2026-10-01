@@ -7,6 +7,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 object JsonExporter {
+    /** 将数据库内容写入用户选择的 JSON 文件。 */
     suspend fun export(context: Context, uri: Uri, repository: StudyRepository) {
         val subjects = repository.subjectsOnce()
         val assignments = repository.assignmentsOnce()

@@ -19,6 +19,7 @@ object CalendarSyncManager {
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_CALENDAR) ==
             PackageManager.PERMISSION_GRANTED
 
+    /** 创建或更新作业对应的系统日历事件。 */
     fun sync(
         context: Context,
         assignment: AssignmentEntity,
@@ -55,6 +56,7 @@ object CalendarSyncManager {
         }
     }
 
+    /** 删除作业已关联的系统日历事件。 */
     fun deleteEvent(context: Context, eventId: Long) {
         if (!hasPermission(context)) return
         try {

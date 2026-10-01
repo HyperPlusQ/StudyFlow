@@ -69,6 +69,7 @@ enum class AppTab(val title: String) {
 }
 
 @Composable
+    /** 应用根组件，负责页面状态与弹窗协调。 */
 fun StudyFlowAppUi(viewModel: AppViewModel) {
     val state by viewModel.uiState.collectAsState()
     val message by viewModel.message.collectAsState()
@@ -204,6 +205,7 @@ private fun AppBackground() {
 }
 
 @Composable
+    /** 手机竖屏使用底栏和正常内容布局。 */
 private fun CompactLayout(
     viewModel: AppViewModel,
     state: AppUiState,
@@ -335,6 +337,7 @@ private fun RowScope.BottomNavigationItem(
 }
 
 @Composable
+    /** 大屏使用右侧悬浮侧边栏布局。 */
 private fun LargeLayout(
     viewModel: AppViewModel,
     state: AppUiState,
@@ -557,6 +560,7 @@ private fun SubjectFilterIcon(
 }
 
 @Composable
+    /** 根据当前标签页渲染主要业务页面。 */
 private fun AppContent(
     viewModel: AppViewModel,
     state: AppUiState,

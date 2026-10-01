@@ -8,6 +8,7 @@ import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
 
 object ReminderScheduler {
+    /** 按提前提醒时长安排截止提醒。 */
     fun schedule(context: Context, assignment: AssignmentEntity) {
         cancel(context, assignment.id)
         val due = assignment.dueDate ?: return
@@ -21,6 +22,7 @@ object ReminderScheduler {
         manager.setWindow(AlarmManager.RTC_WAKEUP, trigger, 10 * 60 * 1000L, pending)
     }
 
+    /** 取消指定作业尚未触发的提醒。 */
     fun cancel(context: Context, assignmentId: Long) {
         val manager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         manager.cancel(pendingIntent(context, assignmentId))

@@ -21,6 +21,7 @@ internal data class WidgetItem(
 )
 
 internal object WidgetDataProvider {
+    /** 生成小组件所需的作业摘要数据。 */
     fun load(context: Context): WidgetSnapshot {
         val repository = StudyRepository(AppDatabase.get(context))
         return runBlocking {

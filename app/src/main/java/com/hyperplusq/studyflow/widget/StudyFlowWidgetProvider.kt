@@ -58,7 +58,7 @@ abstract class StudyFlowWidgetProvider : AppWidgetProvider() {
         }
     }
 
-    private fun buildViews(context: Context, widgetId: Int, snapshot: WidgetSnapshot): RemoteViews =
+    internal fun buildViews(context: Context, widgetId: Int, snapshot: WidgetSnapshot): RemoteViews =
         RemoteViews(context.packageName, layoutRes).apply {
             setOnClickPendingIntent(
                 R.id.widget_root,
@@ -152,22 +152,29 @@ abstract class StudyFlowWidgetProvider : AppWidgetProvider() {
 }
 
 object WidgetUpdater {
+    /** 直接读取数据库并刷新已添加的小组件，避免系统广播延迟造成不同步。 */
     fun requestUpdate(context: Context) {
-        val manager = AppWidgetManager.getInstance(context)
-        val providers = listOf(
-            SmallWidgetProvider::class.java,
-            MediumWidgetProvider::class.java,
-            LargeWidgetProvider::class.java
-        )
-        providers.forEach { providerClass ->
-            val component = ComponentName(context, providerClass)
-            val ids = manager.getAppWidgetIds(component)
-            if (ids.isEmpty()) return@forEach
-            val intent = Intent(context, providerClass).apply {
-                action = AppWidgetManager.ACTION_APPWIDGET_UPDATE
-                putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, ids)
+        val appContext = context.applicationContext
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            try {
+                val snapshot = WidgetDataProvider.load(appContext)
+                val manager = AppWidgetManager.getInstance(appContext)
+                listOf<StudyFlowWidgetProvider>(
+                    SmallWidgetProvider(),
+                    MediumWidgetProvider(),
+                    LargeWidgetProvider()
+                ).forEach { provider ->
+                    val component = ComponentName(appContext, provider.javaClass.name)
+                    manager.getAppWidgetIds(component).forEach { widgetId ->
+                        manager.updateAppWidget(
+                            widgetId,
+                            provider.buildViews(appContext, widgetId, snapshot)
+                        )
+                    }
+                }
+            } catch (error: Exception) {
+                Log.e("StudyFlowWidget", "直接刷新 StudyFlow 小组件失败", error)
             }
-            context.sendBroadcast(intent)
         }
     }
 }

@@ -91,6 +91,7 @@ object JsonImporter {
         val history: List<HistoryRecord>
     )
 
+    /** 校验并用 JSON 内容替换当前数据库。 */
     suspend fun import(
         context: Context,
         uri: Uri,

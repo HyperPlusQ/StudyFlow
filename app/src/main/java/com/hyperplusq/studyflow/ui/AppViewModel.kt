@@ -76,14 +76,17 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun subject(id: Long?): SubjectEntity? = uiState.value.subjects.firstOrNull { it.id == id }
 
+    /** 保存新建或修改后的科目。 */
     fun saveSubject(subject: SubjectEntity) = launchOp("已保存科目") {
         repository.saveSubject(subject)
     }
 
+    /** 删除科目并保留关联作业。 */
     fun deleteSubject(subject: SubjectEntity) = launchOp("已删除科目") {
         repository.deleteSubject(subject)
     }
 
+    /** 保存作业，并同步提醒、提交历史与日历。 */
     fun saveAssignment(
         assignment: AssignmentEntity,
         syncCalendar: Boolean = uiState.value.settings.alwaysSyncCalendar
@@ -95,6 +98,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         syncCalendarIfPossible(saved, syncCalendar)
     }
 
+    /** 删除作业并清理提醒和日历事件。 */
     fun deleteAssignment(id: Long) = launchOp("作业已删除") {
         val existing = repository.assignment(id)?.assignment
         ReminderScheduler.cancel(getApplication(), id)
@@ -102,6 +106,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         repository.deleteAssignment(id)
     }
 
+    /** 切换作业完成状态并刷新关联提醒。 */
     fun setAssignmentCompleted(id: Long, completed: Boolean) = launchOp(
         if (completed) "作业已完成" else "作业已恢复"
     ) {
@@ -185,6 +190,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 从用户选择的 JSON 文件导入数据。 */
     fun importJson(uri: Uri) {
         if (_importing.value || _exporting.value) return
         _importing.value = true
@@ -232,6 +238,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 将当前数据库导出为 JSON 文件。 */
     fun exportJson(uri: Uri) {
         if (_exporting.value) return
         _exporting.value = true
@@ -262,6 +269,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /** 统一执行异步操作、错误提示与小组件刷新。 */
     private fun launchOp(success: String?, action: suspend () -> Unit) {
         viewModelScope.launch {
             try {

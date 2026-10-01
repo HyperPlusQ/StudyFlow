@@ -55,6 +55,7 @@ data class AssignmentFilter(
 }
 
 object SmartScoring {
+    /** 按截止时间、优先级和权重计算关注分数。 */
     fun score(item: AssignmentWithSubtasks, now: Long = System.currentTimeMillis()): Double {
         val assignment = item.assignment
         if (assignment.status == AssignmentStatus.COMPLETED.rawValue) return -1.0
@@ -78,6 +79,7 @@ object SmartScoring {
         return (score - checklistPenalty).coerceAtLeast(0.0)
     }
 
+    /** 按关注分数和截止时间智能排序。 */
     fun sort(items: List<AssignmentWithSubtasks>, now: Long = System.currentTimeMillis()): List<AssignmentWithSubtasks> =
         items.sortedWith(
             compareByDescending<AssignmentWithSubtasks> { score(it, now) }
@@ -87,6 +89,7 @@ object SmartScoring {
 }
 
 object AssignmentQueries {
+    /** 判断作业是否符合当前搜索和筛选条件。 */
     fun matches(item: AssignmentWithSubtasks, filter: AssignmentFilter, scope: ListScope): Boolean {
         val a = item.assignment
         if (scope == ListScope.COMPLETED && a.status != AssignmentStatus.COMPLETED.rawValue) return false
