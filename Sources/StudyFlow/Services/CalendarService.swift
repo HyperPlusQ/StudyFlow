@@ -33,7 +33,7 @@ final class CalendarService {
         set { defaults.set(newValue, forKey: Self.alwaysSyncDefaultsKey) }
     }
 
-    /// 设置开关打开时调用；系统仅会在权限尚未决定时实际弹出授权提示。
+    /// 打开自动同步开关时请求日历权限。
     func requestAccessForAutomaticSync() async throws {
         switch authorizationStatus {
         case .fullAccess, .writeOnly:
@@ -47,9 +47,7 @@ final class CalendarService {
         }
     }
 
-    /// 统一处理新建、编辑与完成后的日历状态：
-    /// - 已有事件的作业始终更新；完成或失去截止日期时删除事件；
-    /// - 尚无事件时，仅在“总是同步”开启时创建。
+    /// 作业变化后自动创建、更新或删除日历事件。
     func synchronizeAfterAssignmentChange(
         _ assignment: Assignment,
         subjectName: String?
@@ -60,6 +58,7 @@ final class CalendarService {
         try await sync(assignment, subjectName: subjectName)
     }
 
+    /// 将作业状态同步到系统日历。
     func sync(_ assignment: Assignment, subjectName: String?) async throws {
         guard !assignment.isCompleted, let due = assignment.dueDate else {
             if assignment.calendarEventIdentifier != nil {
@@ -100,6 +99,7 @@ final class CalendarService {
         assignment.calendarEventIdentifier = event.eventIdentifier
     }
 
+    /// 删除作业已关联的系统日历事件。
     func removeEvent(for assignment: Assignment) throws {
         guard let id = assignment.calendarEventIdentifier else { return }
 

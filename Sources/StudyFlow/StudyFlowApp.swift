@@ -5,6 +5,7 @@ import SwiftUI
 /// 关闭最后一个窗口后自动退出，避免应用保留在后台却没有可显示的窗口，
 /// 导致下一次点击 Dock 图标时表现为“启动失败”。
 final class StudyFlowAppDelegate: NSObject, NSApplicationDelegate {
+    /// 关闭最后窗口后退出进程，避免应用残留。
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
@@ -47,6 +48,7 @@ struct StudyFlowApp: App {
 
     private static var didApplyPackagedIcon = false
 
+    /// 启动时应用应用包内图标。
     static func applyPackagedIconIfNeeded() {
         guard !didApplyPackagedIcon else { return }
         didApplyPackagedIcon = true
@@ -57,6 +59,7 @@ struct StudyFlowApp: App {
         NSApplication.shared.applicationIconImage = image
     }
 
+    /// 创建主窗口、快捷键命令和设置窗口。
     var body: some Scene {
         WindowGroup("StudyFlow") {
             ContentView()

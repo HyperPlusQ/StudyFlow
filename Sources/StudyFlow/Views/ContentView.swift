@@ -25,6 +25,7 @@ struct ContentView: View {
     @State private var showNewTimeBlock = false
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
 
+    /// 组合侧边栏、主内容和编辑弹窗。
     var body: some View {
         NavigationSplitView {
             SidebarView(
@@ -380,11 +381,13 @@ struct SettingsView: View {
         }
     }
 
+    /// 执行 GitHub 更新检查并更新界面状态。
     private func checkForUpdates() async {
         updateState = .checking
         updateState = await GitHubUpdateService.checkForUpdates()
     }
 
+    /// 开启开关时请求日历权限，失败则回滚开关。
     private func requestCalendarAccessForAutomaticSync() {
         Task { @MainActor in
             do {
@@ -397,6 +400,7 @@ struct SettingsView: View {
     }
 
     @MainActor
+    /// 将数据导出到本机或 iCloud 云盘。
     private func exportData(to destination: DataExportService.Destination) {
         do {
             try DataExportService.export(
@@ -413,6 +417,7 @@ struct SettingsView: View {
     }
 
     @MainActor
+    /// 读取并恢复用户选择的 JSON 文件。
     private func importData(from url: URL) {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {

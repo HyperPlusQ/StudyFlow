@@ -5,6 +5,7 @@ import SwiftData
 /// iCloud comparison mirror when automatic synchronization is enabled.
 @MainActor
 enum PersistentStore {
+    /// 统一保存数据库并刷新同步与小组件快照。
     static func save(_ context: ModelContext) {
         do {
             try context.save()

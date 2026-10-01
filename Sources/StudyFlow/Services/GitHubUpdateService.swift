@@ -51,6 +51,7 @@ enum GitHubUpdateService {
         "https://github.com/HyperPlusQ/StudyFlow/releases"
     }
 
+    /// 查询 GitHub 最新版本并比较当前版本。
     static func checkForUpdates() async -> UpdateCheckState {
         do {
             let latest = try await fetchLatestRelease()
@@ -75,6 +76,7 @@ enum GitHubUpdateService {
         }
     }
 
+    /// 规范化版本字符串并移除前缀 v。
     static func normalizedVersion(_ rawValue: String) -> String {
         var value = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.lowercased().hasPrefix("v") {
@@ -83,6 +85,7 @@ enum GitHubUpdateService {
         return value
     }
 
+    /// 按语义版本判断新版本是否更新。
     static func isNewer(_ lhs: String, than rhs: String) -> Bool {
         let left = semanticComponents(lhs)
         let right = semanticComponents(rhs)

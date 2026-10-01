@@ -58,6 +58,7 @@ final class ICloudSyncCoordinator {
     }
 
     @discardableResult
+    /// 开启或关闭 iCloud 云盘自动同步。
     func setEnabled(_ enabled: Bool, context: ModelContext) -> Bool {
         if enabled {
             guard folderBookmark != nil || chooseFolder() else {
@@ -112,6 +113,7 @@ final class ICloudSyncCoordinator {
     }
 
     @discardableResult
+    /// 按修改时间比较并合并本地与 iCloud 文件。
     func synchronize(context: ModelContext) -> Bool {
         guard isEnabled else {
             lastMessage = "自动同步尚未开启。"
@@ -200,6 +202,7 @@ final class ICloudSyncCoordinator {
         }
     }
 
+    /// 应用启动时执行到期或必要的同步。
     func performLaunchSyncIfNeeded(context: ModelContext) {
         guard isEnabled else { return }
 
@@ -212,6 +215,7 @@ final class ICloudSyncCoordinator {
         }
     }
 
+    /// 应用运行期间检查每日同步时间。
     func checkScheduledSyncIfNeeded(context: ModelContext) {
         guard isEnabled,
               scheduledTimeReached,
@@ -223,8 +227,7 @@ final class ICloudSyncCoordinator {
         }
     }
 
-    /// Refreshes the local comparison file after a database save and advances
-    /// its modification timestamp so the next synchronization can propagate it.
+    /// 数据变更后刷新本地同步比较文件。
     func refreshLocalSnapshotIfNeeded(context: ModelContext) {
         guard isEnabled, let localURL = try? localSyncURL() else { return }
         guard FileManager.default.fileExists(atPath: localURL.path) else { return }

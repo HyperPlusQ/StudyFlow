@@ -98,6 +98,7 @@ enum DataExportService {
     }
 
     @MainActor
+    /// 将当前数据库编码为 JSON 数据。
     static func currentData(context: ModelContext) throws -> Data {
         try encodedDocument(
             subjects: try context.fetch(FetchDescriptor<Subject>()),
@@ -109,6 +110,7 @@ enum DataExportService {
 
     /// Decodes and validates a complete snapshot before making any destructive database change.
     @MainActor
+    /// 校验 JSON 后恢复到当前数据库。
     static func restore(data: Data, into context: ModelContext) throws {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
@@ -201,6 +203,7 @@ enum DataExportService {
         }
     }
 
+    /// 写入同步文件并保留指定修改时间。
     static func write(_ data: Data, to url: URL, modificationDate: Date? = nil) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(
