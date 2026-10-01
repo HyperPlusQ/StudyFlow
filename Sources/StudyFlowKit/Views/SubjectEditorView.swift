@@ -83,7 +83,6 @@ struct SubjectEditorView: View {
                                         Image(systemName: "trash")
                                     }
                                     .buttonStyle(.borderless)
-                                    .platformHelp("从本科目的历史记录中删除")
                                 }
                             }
                         }
@@ -95,7 +94,7 @@ struct SubjectEditorView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(existing == nil ? "新建科目" : "编辑科目")
-            .platformSheetFrame(width: 520, height: 620)
+            .platformSheetFrame()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

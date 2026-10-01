@@ -1,9 +1,10 @@
 import SwiftData
 import SwiftUI
 
-/// Creates the SwiftData container used by every StudyFlow application target.
+/// 创建 StudyFlow 各应用目标共用的 SwiftData 容器。
 @MainActor
 public enum StudyFlowStorage {
+    /// 创建应用和测试共享的 SwiftData 容器。
     public static func makeContainer() throws -> ModelContainer {
         let schema = Schema([
             Subject.self,
@@ -28,44 +29,26 @@ public enum StudyFlowStorage {
     }
 }
 
-/// Lets an application shell refresh widget data without importing the
-/// widget-shared target directly.
+/// 让应用壳层无需直接依赖小组件共享目标即可刷新小组件数据。
 @MainActor
 public enum StudyFlowWidgetBridge {
+    /// 将最新作业摘要写入小组件共享存储。
     public static func refresh(context: ModelContext) {
         WidgetSnapshotService.refresh(context: context)
     }
 }
 
-/// Platform-neutral entry point for the shared StudyFlow feature shell.
+/// iOS 应用的共享功能入口，负责挂载主界面并恢复 iCloud 自动同步。
 @MainActor
 public struct StudyFlowRootView: View {
-    private let exporter: (any StudyFlowDataExporter)?
-    private let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
-
-    public init(
-        exporter: (any StudyFlowDataExporter)? = nil,
-        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
-    ) {
-        self.exporter = exporter
-        self.cloudFolderProvider = cloudFolderProvider
-    }
+    public init() {}
 
     public var body: some View {
-        ContentView(
-            exporter: exporter,
-            cloudFolderProvider: cloudFolderProvider
-        )
-        .onAppear {
-            ICloudSyncCoordinator.shared.configure(
-                folderProvider: cloudFolderProvider
-            )
-        }
+        ContentView()
     }
 }
 
-/// Lets platform shells trigger shared toolbar/menu actions without exposing
-/// the internal notification names used by `ContentView`.
+/// 让平台壳层触发共享工具栏操作，同时隐藏内部通知名称。
 @MainActor
 public enum StudyFlowCommands {
     public static func postNewAssignment() {
@@ -78,33 +61,5 @@ public enum StudyFlowCommands {
 
     public static func postNewTimeBlock() {
         NotificationCenter.default.post(name: .studyFlowNewTimeBlock, object: nil)
-    }
-}
-
-/// macOS exposes settings in a separate scene; future Apple platforms can
-/// present the same shared settings content from their own navigation shell.
-@MainActor
-public struct StudyFlowSettingsView: View {
-    private let exporter: (any StudyFlowDataExporter)?
-    private let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
-
-    public init(
-        exporter: (any StudyFlowDataExporter)? = nil,
-        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
-    ) {
-        self.exporter = exporter
-        self.cloudFolderProvider = cloudFolderProvider
-    }
-
-    public var body: some View {
-        SettingsView(
-            exporter: exporter,
-            cloudFolderProvider: cloudFolderProvider
-        )
-        .onAppear {
-            ICloudSyncCoordinator.shared.configure(
-                folderProvider: cloudFolderProvider
-            )
-        }
     }
 }

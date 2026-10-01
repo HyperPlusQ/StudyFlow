@@ -3,6 +3,7 @@ import SwiftData
 
 @MainActor
 enum StudyOperations {
+    /// 递归收集指定科目的全部子科目。
     static func descendants(of subject: Subject, in subjects: [Subject]) -> [Subject] {
         var queue = [subject]
         var collected: [Subject] = []
@@ -18,6 +19,7 @@ enum StudyOperations {
         candidate.id == root.id || descendants(of: root, in: subjects).contains { $0.id == candidate.id }
     }
 
+    /// 删除科目并解除作业、时间块和历史记录关联。
     static func delete(_ subject: Subject, from subjects: [Subject], assignments: [Assignment], context: ModelContext) {
         for child in subjects where child.parentId == subject.id {
             child.parentId = subject.parentId

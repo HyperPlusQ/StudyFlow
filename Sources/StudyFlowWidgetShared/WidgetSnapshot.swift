@@ -1,10 +1,8 @@
 import Foundation
 
-/// The compact, read-only payload shared between StudyFlow and its widgets.
+/// StudyFlow 主应用与小组件共享的只读数据快照。
 ///
-/// Keeping this model in a dedicated target lets both the application and the
-/// widget extension decode exactly the same schema without pulling SwiftData
-/// into the widget process.
+/// 独立目标确保主应用与扩展使用相同结构，同时避免小组件进程依赖 SwiftData。
 public struct WidgetSnapshot: Codable, Sendable {
     public struct Item: Codable, Sendable, Identifiable, Hashable {
         public let id: UUID

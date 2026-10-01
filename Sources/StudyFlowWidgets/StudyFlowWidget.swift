@@ -29,6 +29,7 @@ private struct StudyFlowProvider: TimelineProvider {
         )
     }
 
+    /// 读取共享快照并设置小组件刷新时间。
     func getTimeline(in context: Context, completion: @escaping (Timeline<StudyFlowEntry>) -> Void) {
         let entry = StudyFlowEntry(date: .now, snapshot: WidgetSnapshotStore.load())
         completion(

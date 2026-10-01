@@ -4,6 +4,7 @@ public enum WidgetSnapshotStore {
     public static let appGroupIdentifier = "group.com.openai.studyflow"
     public static let fileName = "widget-snapshot.json"
 
+    /// 保存小组件共享 JSON 快照。
     public static func save(_ snapshot: WidgetSnapshot) throws {
         guard let container = sharedContainer() else {
             throw WidgetSnapshotError.unavailableContainer
@@ -19,6 +20,7 @@ public enum WidgetSnapshotStore {
         )
     }
 
+    /// 读取最近一次保存的小组件快照。
     public static func load() -> WidgetSnapshot? {
         guard let container = sharedContainer(),
               let data = try? Data(

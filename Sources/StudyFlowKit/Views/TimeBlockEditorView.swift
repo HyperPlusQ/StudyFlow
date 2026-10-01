@@ -59,7 +59,7 @@ struct TimeBlockEditorView: View {
             }
             .formStyle(.grouped)
             .navigationTitle("安排工作时间")
-            .platformSheetFrame(width: 460, height: 440)
+            .platformSheetFrame()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) {

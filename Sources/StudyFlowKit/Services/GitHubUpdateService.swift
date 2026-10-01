@@ -39,8 +39,7 @@ enum GitHubUpdateService {
         string: "https://api.github.com/repos/HyperPlusQ/StudyFlow/tags?per_page=30"
     )!
 
-    /// Matches Resources/Info.plist and keeps Xcode's direct SwiftPM runs
-    /// reporting the correct version when no application bundle exists.
+    /// 与 Xcode 工程版本保持一致，应用包缺失时也能报告正确版本。
     static let bundledVersion = "1.5.0"
 
     static var currentVersion: String {
@@ -55,6 +54,7 @@ enum GitHubUpdateService {
         "https://github.com/HyperPlusQ/StudyFlow/releases"
     }
 
+    /// 查询 GitHub 最新版本并比较当前版本。
     static func checkForUpdates() async -> UpdateCheckState {
         do {
             let latest = try await fetchLatestRelease()
@@ -87,6 +87,7 @@ enum GitHubUpdateService {
         return value
     }
 
+    /// 按语义版本判断新版本是否更新。
     static func isNewer(_ lhs: String, than rhs: String) -> Bool {
         let left = semanticComponents(lhs)
         let right = semanticComponents(rhs)

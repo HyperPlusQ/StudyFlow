@@ -100,7 +100,6 @@ struct AssignmentListView: View {
                 .keyboardShortcut("n", modifiers: [.command])
             }
         }
-        #if os(iOS)
         .sheet(isPresented: Binding(
             get: { selectedAssignmentId != nil },
             set: { if !$0 { selectedAssignmentId = nil } }
@@ -116,15 +115,6 @@ struct AssignmentListView: View {
             .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
         }
-        #else
-        .inspector(isPresented: Binding(
-            get: { selectedAssignmentId != nil },
-            set: { if !$0 { selectedAssignmentId = nil } }
-        )) {
-            assignmentDetailContent
-                .inspectorColumnWidth(min: 340, ideal: 390, max: 460)
-        }
-        #endif
         .sheet(item: $editingAssignment) { AssignmentEditorView(mode: .edit($0), subjects: subjects) }
         .sheet(item: $schedulingAssignment) { TimeBlockEditorView(subjects: subjects, assignment: $0) }
     }
@@ -150,19 +140,11 @@ struct AssignmentListView: View {
 
     @ViewBuilder
     private var assignmentList: some View {
-        #if os(macOS)
-        List(selection: $selectedAssignmentId) {
-            assignmentListContent
-        }
-        .listStyle(.inset)
-        .scrollContentBackground(.hidden)
-        #else
         List {
             assignmentListContent
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
-        #endif
     }
 
     @ViewBuilder
@@ -197,7 +179,8 @@ struct AssignmentListView: View {
                 .foregroundStyle(.secondary)
             if !filter.isDefault {
                 Text("已应用筛选").font(.caption).foregroundStyle(Color.accentColor)
-                Button("清除") { filter.reset() }.platformLinkButtonStyle()
+                Button("清除") { filter.reset() }
+                    .buttonStyle(.borderless)
             }
             Spacer()
             if scope.scope != .completed && !visibleAssignments.isEmpty {
@@ -276,7 +259,6 @@ struct AssignmentRow: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.plain)
-            .platformHelp(assignment.isCompleted ? "恢复进行中" : "标记为已完成")
 
             if let rank, rank <= 5 {
                 Text("\(rank)")
@@ -286,38 +268,50 @@ struct AssignmentRow: View {
                     .background(rank == 1 ? Color.orange : Color.accentColor, in: Circle())
             }
 
-            VStack(alignment: .leading, spacing: 5) {
-                HStack(spacing: 7) {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
                     Text(assignment.title)
                         .font(.body.weight(.medium))
                         .strikethrough(assignment.isCompleted)
-                        .lineLimit(1)
+                        .fixedSize(horizontal: false, vertical: true)
                     if !assignment.subtasks.isEmpty {
-                        Label("\(assignment.completedCount)/\(assignment.subtasks.count)", systemImage: "checklist")
-                            .font(.caption).foregroundStyle(.secondary)
+                        Label(
+                            "\(assignment.completedCount)/\(assignment.subtasks.count)",
+                            systemImage: "checklist"
+                        )
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                     }
                 }
-                HStack(spacing: 10) {
+
+                if !assignment.details.isEmpty {
+                    Text(assignment.details)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     SubjectBadge(subject: subject)
+                    Spacer(minLength: 8)
+                    DueLabel(date: assignment.dueDate, completed: assignment.isCompleted)
+                }
+
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
                     SubmissionMethodView(value: assignment.submissionMethod, compact: true)
+                    Spacer(minLength: 8)
+                    HStack(spacing: 4) {
+                        SafeSystemImage(systemName: assignment.priority.symbol, fallback: "exclamationmark")
+                        Text(assignment.priority.label)
+                    }
+                    .font(.caption2)
+                    .foregroundStyle(assignment.priority == .critical ? .red : .secondary)
                 }
-            }
-            Spacer(minLength: 16)
-            VStack(alignment: .trailing, spacing: 7) {
-                DueLabel(date: assignment.dueDate, completed: assignment.isCompleted)
-                HStack(spacing: 4) {
-                    SafeSystemImage(systemName: assignment.priority.symbol, fallback: "exclamationmark")
-                    Text(assignment.priority.label)
-                }
-                .font(.caption2)
-                .foregroundStyle(assignment.priority == .critical ? .red : .secondary)
             }
         }
         .padding(.vertical, 3)
         .contentShape(Rectangle())
-        #if os(iOS)
         .onTapGesture(perform: onOpen)
-        #endif
         .contextMenu {
             Button(assignment.isCompleted ? "恢复进行中" : "标记为已完成", action: onToggle)
             Button("编辑…", action: onEdit)
@@ -331,26 +325,114 @@ private struct FilterPopover: View {
     let subjects: [Subject]
 
     var body: some View {
-        Form {
-            Picker("截止日期", selection: $filter.dueWindow) {
-                ForEach(DueWindow.allCases) { Text($0.label).tag($0) }
-            }
-            Picker("科目", selection: $filter.subjectId) {
-                Text("全部科目").tag(UUID?.none)
-                ForEach(subjects.sorted { $0.name < $1.name }) {
-                    Text($0.name).tag(UUID?.some($0.id))
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 8) {
+                Label("筛选", systemImage: "line.3.horizontal.decrease")
+                    .font(.headline)
+                Spacer()
+                if !filter.isDefault {
+                    Button("重置") { filter.reset() }
+                        .buttonStyle(.borderless)
+                        .font(.subheadline)
                 }
             }
-            Picker("优先级", selection: $filter.priority) {
-                Text("不限").tag(Priority?.none)
-                ForEach(Priority.allCases) {
-                    Text($0.label).tag(Priority?.some($0))
+
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible(), spacing: 10),
+                    GridItem(.flexible(), spacing: 10)
+                ],
+                spacing: 10
+            ) {
+                FilterCard(title: "截止日期", icon: "calendar") {
+                    Picker("截止日期", selection: $filter.dueWindow) {
+                        ForEach(DueWindow.allCases) { Text($0.label).tag($0) }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                FilterCard(title: "优先级", icon: "exclamationmark.circle") {
+                    Picker("优先级", selection: $filter.priority) {
+                        Text("不限").tag(Priority?.none)
+                        ForEach(Priority.allCases) {
+                            Text($0.label).tag(Priority?.some($0))
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                FilterCard(title: "仅含子任务", icon: "checklist") {
+                    Toggle("仅含子任务", isOn: $filter.hasChecklistOnly)
+                        .labelsHidden()
+                        .toggleStyle(.switch)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                FilterCard(title: "筛选状态", icon: "slider.horizontal.3") {
+                    Text(filter.isDefault ? "默认条件" : "已应用筛选")
+                        .font(.subheadline)
+                        .foregroundStyle(filter.isDefault ? .secondary : Color.accentColor)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            Toggle("仅显示含子任务的作业", isOn: $filter.hasChecklistOnly)
-            Button("重置全部筛选") { filter.reset() }
+
+            FilterCard(title: "科目", icon: "book.closed") {
+                Picker("科目", selection: $filter.subjectId) {
+                    Text("全部科目").tag(UUID?.none)
+                    ForEach(subjects.sorted { $0.name < $1.name }) {
+                        Text($0.name).tag(UUID?.some($0.id))
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(.menu)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
-        .formStyle(.grouped)
-        .padding(12)
+        .padding(14)
+    }
+}
+
+/// 将单个筛选条件包装为紧凑的小卡片，保持标题与控件的层级清晰。
+private struct FilterCard<Content: View>: View {
+    let title: String
+    let icon: String
+    private let content: Content
+
+    init(
+        title: String,
+        icon: String,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.title = title
+        self.icon = icon
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label {
+                Text(title)
+            } icon: {
+                SafeSystemImage(systemName: icon, fallback: "slider.horizontal.3")
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(.secondary)
+
+            content
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(.thinMaterial)
+        )
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
     }
 }

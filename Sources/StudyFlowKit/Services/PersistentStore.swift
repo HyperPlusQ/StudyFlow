@@ -1,10 +1,10 @@
 import Foundation
 import SwiftData
 
-/// Single save path used by user-facing edits. Saving also refreshes the local
-/// iCloud comparison mirror when automatic synchronization is enabled.
+/// 用户编辑的统一保存入口，并在开启同步时刷新本地比较文件。
 @MainActor
 enum PersistentStore {
+    /// 统一保存数据库并刷新同步与小组件快照。
     static func save(_ context: ModelContext) {
         do {
             try context.save()

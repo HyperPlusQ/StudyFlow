@@ -18,7 +18,6 @@ struct SubmissionMethodView: View {
                 .foregroundStyle(.tint)
             }
             .buttonStyle(.plain)
-            .platformHelp(helpText(for: target))
         } else if value.isEmpty {
             if compact {
                 EmptyView()

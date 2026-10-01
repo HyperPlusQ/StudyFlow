@@ -1,18 +1,5 @@
 import SwiftUI
 
-#if os(macOS)
-import AppKit
-
-extension Color {
-    static var studyFlowWindowBackground: Color {
-        Color(nsColor: .windowBackgroundColor)
-    }
-
-    static var studyFlowControlBackground: Color {
-        Color(nsColor: .controlBackgroundColor)
-    }
-}
-#elseif os(iOS)
 import UIKit
 
 extension Color {
@@ -24,18 +11,11 @@ extension Color {
         Color(uiColor: .secondarySystemBackground)
     }
 }
-#endif
 
 enum PlatformSymbolAvailability {
     static func contains(_ name: String) -> Bool {
         guard !name.isEmpty else { return false }
-        #if os(macOS)
-        return NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil
-        #elseif os(iOS)
         return UIImage(systemName: name) != nil
-        #else
-        return false
-        #endif
     }
 
     static func resolve(_ name: String?, fallback: String = "book.closed") -> String {
@@ -49,7 +29,7 @@ enum PlatformSymbolAvailability {
     }
 }
 
-/// Replaces missing or unavailable SF Symbols with a stable native fallback.
+/// 将缺失或当前系统不可用的 SF Symbol 替换为稳定图标。
 struct SafeSystemImage: View {
     let systemName: String
     var fallback = "book.closed"
@@ -59,7 +39,7 @@ struct SafeSystemImage: View {
     }
 }
 
-/// A restrained, color-aware backdrop shared by the split view and inspector.
+/// 页面共享的低饱和度、支持动态颜色的背景。
 struct StudyFlowBackdrop: View {
     @Environment(\.colorScheme) private var colorScheme
 
@@ -100,15 +80,24 @@ struct StudyFlowBackdrop: View {
     }
 }
 
+
+/// 透明、无填充的原生按钮样式，用于设置页操作按钮。
+private struct StudyFlowTransparentButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .foregroundStyle(.tint)
+            .opacity(configuration.isPressed ? 0.55 : 1)
+    }
+}
+
 extension View {
-    /// Uses Apple's native Liquid Glass button on supported systems, with a
-    /// larger continuous-corner bordered fallback on earlier releases.
+    /// 支持的系统使用原生 Liquid Glass 按钮，旧系统回退为大圆角边框按钮。
     @ViewBuilder
     func studyFlowGlassButtonStyle(
         prominent: Bool = false,
         cornerRadius: CGFloat = 18
     ) -> some View {
-        if #available(macOS 26.0, iOS 26.0, *) {
+        if #available(iOS 26.0, *) {
             if prominent {
                 buttonStyle(.glassProminent)
             } else {
@@ -124,12 +113,17 @@ extension View {
         }
     }
 
+    /// 设置页使用的透明按钮样式：不绘制填充和边框，仅保留系统着色与按压反馈。
+    func studyFlowTransparentButtonStyle() -> some View {
+        buttonStyle(StudyFlowTransparentButtonStyle())
+    }
+
     @ViewBuilder
     func studyFlowGlassSurface(cornerRadius: CGFloat = 20, prominent: Bool = false) -> some View {
         let radius = max(cornerRadius, 20)
         let shape = RoundedRectangle(cornerRadius: radius, style: .continuous)
 
-        if #available(macOS 26.0, iOS 26.0, *) {
+        if #available(iOS 26.0, *) {
             let glass: Glass = .regular
             self
                 .clipShape(shape)
@@ -155,81 +149,29 @@ extension View {
 
     @ViewBuilder
     func platformTransparentToolbar() -> some View {
-        #if os(macOS)
-        if #available(macOS 26.0, *) {
-            // Preserve the system toolbar's native Liquid Glass material.
-            self
-        } else if #available(macOS 15.0, *) {
-            toolbarBackgroundVisibility(.hidden, for: .windowToolbar)
-        } else {
-            toolbarBackground(.hidden, for: .windowToolbar)
-        }
-        #else
         if #available(iOS 26.0, *) {
-            // Preserve the system navigation bar's native Liquid Glass material.
+            // 保留系统导航栏自带的 Liquid Glass 材质。
             self
         } else if #available(iOS 18.0, *) {
             toolbarBackgroundVisibility(.hidden, for: .navigationBar)
         } else {
             toolbarBackground(.hidden, for: .navigationBar)
         }
-        #endif
     }
 }
 
 extension View {
-    /// Uses a fixed native sheet size on macOS and a full-screen adaptive
-    /// detent on iOS so the same editor works on every screen ratio.
+    /// 使用自适应全屏 Sheet，兼容不同尺寸的 iPhone 和 iPad。
     @ViewBuilder
-    func platformSheetFrame(width: CGFloat, height: CGFloat) -> some View {
-        #if os(iOS)
+    func platformSheetFrame() -> some View {
         self
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .presentationDetents([.large])
             .presentationContentInteraction(.scrolls)
-        #else
-        self.frame(width: width, height: height)
-        #endif
-    }
-
-    /// `.help` is a macOS presentation affordance; keeping the call behind a
-    /// shared helper prevents the shared target from depending on AppKit.
-    @ViewBuilder
-    func platformHelp(_ text: String) -> some View {
-        #if os(macOS)
-        help(text)
-        #else
-        self
-        #endif
     }
 
     @ViewBuilder
     func platformCheckboxStyle() -> some View {
-        #if os(macOS)
-        toggleStyle(.checkbox)
-        #else
         toggleStyle(.switch)
-        #endif
-    }
-}
-
-extension View {
-    /// `.buttonStyle(.link)` is a macOS-only affordance.
-    @ViewBuilder
-    func platformNavigationSubtitle(_ text: String) -> some View {
-        #if os(macOS)
-        navigationSubtitle(text)
-        #else
-        self
-        #endif
-    }
-
-    @ViewBuilder
-    func platformLinkButtonStyle() -> some View {
-        #if os(macOS)
-        buttonStyle(.link)
-        #else
-        buttonStyle(.borderless)
-        #endif
     }
 }

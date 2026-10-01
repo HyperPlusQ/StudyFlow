@@ -14,6 +14,7 @@ final class NotificationManager: @unchecked Sendable {
         }
     }
 
+    /// 按截止时间和提前提醒时长创建本地通知。
     func schedule(for assignment: Assignment) {
         cancel(for: assignment.id)
         guard !assignment.isCompleted,
@@ -44,6 +45,7 @@ final class NotificationManager: @unchecked Sendable {
         UNUserNotificationCenter.current().add(request)
     }
 
+    /// 取消指定作业的本地通知。
     func cancel(for id: UUID) {
         UNUserNotificationCenter.current()
             .removePendingNotificationRequests(withIdentifiers: ["assignment-\(id.uuidString)"])

@@ -10,9 +10,6 @@ extension Notification.Name {
 }
 
 struct ContentView: View {
-    let exporter: (any StudyFlowDataExporter)?
-    let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
-
     @Environment(\.modelContext) private var context
     @Query(sort: \Subject.sortOrder) private var subjects: [Subject]
     @Query(sort: \Assignment.updatedAt, order: .reverse) private var assignments: [Assignment]
@@ -24,80 +21,16 @@ struct ContentView: View {
     @State private var editingAssignment: Assignment?
     @State private var showNewSubject = false
     @State private var newSubjectParent: Subject?
-    @State private var editingSubject: Subject?
+    @State private var subjectBeingEdited: Subject?
     @State private var showNewTimeBlock = false
-    @State private var showSettings = false
     @State private var syncCoordinator = ICloudSyncCoordinator.shared
-    #if os(iOS)
     @State private var iosTab: IOSTab = .dashboard
-    #endif
 
-    init(
-        exporter: (any StudyFlowDataExporter)? = nil,
-        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
-    ) {
-        self.exporter = exporter
-        self.cloudFolderProvider = cloudFolderProvider
-    }
+    /// 创建 iOS 主内容视图，所有状态均由默认值初始化。
+    init() {}
 
     var body: some View {
-        Group {
-            #if os(iOS)
-            iosTabView
-            #else
-            NavigationSplitView {
-                SidebarView(
-                    selection: $selection,
-                    subjects: subjects,
-                    assignments: assignments,
-                    onNewAssignment: { showNewAssignment = true },
-                    onNewSubject: { parent in
-                        newSubjectParent = parent
-                        editingSubject = nil
-                        showNewSubject = true
-                    },
-                    onEditSubject: { subject in
-                        editingSubject = subject
-                        newSubjectParent = nil
-                        showNewSubject = true
-                    }
-                )
-                .navigationSplitViewColumnWidth(min: 210, ideal: 250, max: 320)
-            } detail: {
-                Group {
-                    if selection.scope == .dashboard {
-                        DashboardView(
-                            assignments: assignments,
-                            subjects: subjects,
-                            blocks: blocks,
-                            onNewBlock: { showNewTimeBlock = true }
-                        )
-                    } else {
-                        AssignmentListView(
-                            scope: selection,
-                            assignments: assignments,
-                            subjects: subjects,
-                            blocks: blocks,
-                            filter: $filter,
-                            onNewAssignment: { showNewAssignment = true }
-                        )
-                    }
-                }
-            }
-            .platformTransparentToolbar()
-            .navigationTitle(selection.scope.title)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showSettings = true
-                    } label: {
-                        SafeSystemImage(systemName: "gearshape", fallback: "ellipsis.circle")
-                    }
-                    .accessibilityLabel("设置")
-                }
-            }
-            #endif
-        }
+        iosTabView
         .background { StudyFlowBackdrop().ignoresSafeArea() }
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
@@ -113,7 +46,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: .studyFlowNewSubject)) { _ in
             newSubjectParent = nil
-            editingSubject = nil
+            subjectBeingEdited = nil
             showNewSubject = true
         }
         .onReceive(NotificationCenter.default.publisher(for: .studyFlowNewTimeBlock)) { _ in
@@ -125,23 +58,18 @@ struct ContentView: View {
         .sheet(item: $editingAssignment) {
             AssignmentEditorView(mode: .edit($0), subjects: subjects)
         }
+        .sheet(item: $subjectBeingEdited) {
+            SubjectEditorView(existing: $0, subjects: subjects)
+        }
         .sheet(isPresented: $showNewSubject) {
-            SubjectEditorView(existing: editingSubject, subjects: subjects)
+            SubjectEditorView(existing: nil, subjects: subjects)
         }
         .sheet(isPresented: $showNewTimeBlock) {
             TimeBlockEditorView(subjects: subjects)
         }
-        .sheet(isPresented: $showSettings) {
-            NavigationStack {
-                StudyFlowSettingsView()
-            }
-        }
     }
 
-    #if os(iOS)
-    /// The iOS shell mirrors the Android application's page-oriented layout:
-    /// five top-level destinations switch through a native `TabView`, whose
-    /// system tab bar adopts Liquid Glass on supported releases.
+    /// 使用原生底部标签栏切换主要页面。
     private var iosTabView: some View {
         TabView(selection: $iosTab) {
             NavigationStack {
@@ -184,13 +112,12 @@ struct ContentView: View {
                     assignments: assignments,
                     onNewSubject: {
                         newSubjectParent = nil
-                        editingSubject = nil
+                        subjectBeingEdited = nil
                         showNewSubject = true
                     },
                     onEditSubject: { subject in
-                        editingSubject = subject
-                        newSubjectParent = nil
-                        showNewSubject = true
+                        showNewSubject = false
+                        subjectBeingEdited = subject
                     }
                 )
             }
@@ -198,10 +125,7 @@ struct ContentView: View {
             .tag(IOSTab.subjects)
 
             NavigationStack {
-                SettingsView(
-                    exporter: exporter,
-                    cloudFolderProvider: cloudFolderProvider
-                )
+                SettingsView()
             }
             .tabItem { Label("设置", systemImage: "gearshape") }
             .tag(IOSTab.settings)
@@ -209,13 +133,9 @@ struct ContentView: View {
         .tint(.accentColor)
         .tabViewStyle(.automatic)
     }
-    #endif
 }
 
 struct SettingsView: View {
-    let exporter: (any StudyFlowDataExporter)?
-    let cloudFolderProvider: (any StudyFlowCloudFolderProvider)?
-
     @Environment(\.modelContext) private var context
 
     @State private var notice: String?
@@ -225,20 +145,10 @@ struct SettingsView: View {
     @AppStorage(CalendarService.alwaysSyncDefaultsKey) private var alwaysSyncCalendar = false
     @State private var isImporting = false
     @State private var pendingImportURL: URL?
-    #if os(iOS)
     @State private var isChoosingCloudFolder = false
     @State private var pendingFolderEnable = false
     @State private var isExporting = false
     @State private var exportDocument: JSONFileDocument?
-    #endif
-
-    init(
-        exporter: (any StudyFlowDataExporter)? = nil,
-        cloudFolderProvider: (any StudyFlowCloudFolderProvider)? = nil
-    ) {
-        self.exporter = exporter
-        self.cloudFolderProvider = cloudFolderProvider
-    }
 
     var body: some View {
         Form {
@@ -250,6 +160,7 @@ struct SettingsView: View {
                             notice = "权限请求已发送；可在系统设置中修改。"
                         }
                     }
+                    .studyFlowTransparentButtonStyle()
                 }
                 Text("每份作业都可以在编辑器中设置提前 0、1、6、24 或 48 小时提醒。")
                     .font(.caption)
@@ -285,10 +196,16 @@ struct SettingsView: View {
                             ProgressView().controlSize(.small)
                             Text("正在检查…")
                         } else {
-                            Label("从 GitHub 检查更新", systemImage: "arrow.clockwise.circle")
+                            Label {
+                                Text("从 GitHub 检查更新")
+                            } icon: {
+                                Image(systemName: "arrow.clockwise.circle")
+                                    .symbolRenderingMode(.hierarchical)
+                                    .foregroundStyle(.tint)
+                            }
                         }
                     }
-                    .studyFlowGlassButtonStyle(prominent: true)
+                    .studyFlowTransparentButtonStyle()
                     .disabled({
                         if case .checking = updateState { return true }
                         return false
@@ -298,17 +215,18 @@ struct SettingsView: View {
 
                     if case let .updateAvailable(_, url) = updateState {
                         Link("查看更新", destination: url)
-                            .studyFlowGlassButtonStyle(prominent: true)
+                            .studyFlowTransparentButtonStyle()
                     }
                 }
                 if case .failed = updateState {
                     Button("重新检查") {
                         Task { await checkForUpdates() }
                     }
-                    .buttonStyle(.borderless)
+                    .studyFlowTransparentButtonStyle()
                 }
                 Link("前往 StudyFlow on GitHub", destination: GitHubUpdateService.projectURL)
                     .font(.caption)
+                    .studyFlowTransparentButtonStyle()
                 Text("更新检查读取 GitHub 的 Release 与 Tag 信息；更新页面由系统浏览器打开，并由用户完成下载安装。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -322,14 +240,7 @@ struct SettingsView: View {
                         set: { enabled in
                             if enabled && !syncCoordinator.hasSelectedFolder {
                                 pendingFolderEnable = true
-                                #if os(iOS)
                                 isChoosingCloudFolder = true
-                                #else
-                                if !syncCoordinator.setEnabled(enabled, context: context) {
-                                    notice = "未选择同步文件夹，自动同步保持关闭。"
-                                }
-                                pendingFolderEnable = false
-                                #endif
                                 return
                             }
                             if !syncCoordinator.setEnabled(enabled, context: context) {
@@ -381,31 +292,31 @@ struct SettingsView: View {
                     }
                 }
 
-                HStack {
+                VStack(alignment: .leading, spacing: 10) {
                     Button {
-                        #if os(iOS)
                         isChoosingCloudFolder = true
                         pendingFolderEnable = false
-                        #else
-                        syncCoordinator.chooseFolder(context: context)
-                        #endif
                     } label: {
-                        Label(syncCoordinator.hasSelectedFolder ? "更改同步文件夹…" : "选择同步文件夹…", systemImage: "folder")
+                        Label(
+                            syncCoordinator.hasSelectedFolder ? "更改同步文件夹…" : "选择同步文件夹…",
+                            systemImage: "folder"
+                        )
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .multilineTextAlignment(.leading)
                     }
-                    .studyFlowGlassButtonStyle()
-                    #if os(macOS)
-                    .disabled(!syncCoordinator.isEnabled || cloudFolderProvider == nil)
-                    #endif
+                    .studyFlowTransparentButtonStyle()
+                    .frame(maxWidth: .infinity)
 
                     Button {
                         syncCoordinator.synchronize(context: context)
                     } label: {
                         Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
                     }
-                    .studyFlowGlassButtonStyle(prominent: true)
-                    .disabled(!syncCoordinator.isEnabled || !syncCoordinator.hasSelectedFolder)
-
-                    Spacer()
+                    .studyFlowTransparentButtonStyle()
+                    .disabled(!syncCoordinator.hasSelectedFolder || syncCoordinator.isSynchronizing)
+                    .frame(maxWidth: .infinity)
                 }
 
                 Text("开启后，每次打开 StudyFlow 都会同步；到达设定时间后，在应用运行期间也会自动同步。系统比较本地与 iCloud 中 \(ICloudSyncCoordinator.fileName) 的修改时间，并用较新的文件覆盖较旧的文件。")
@@ -417,45 +328,36 @@ struct SettingsView: View {
                 LabeledContent("存储方式") { Text("SwiftData 本地存储") }
                 LabeledContent("云盘备份") { Text("iCloud 云盘 JSON 导出") }
 
-                HStack {
-                    #if os(iOS)
+                VStack(alignment: .leading, spacing: 10) {
                     Button {
                         exportData(to: .anywhere)
                     } label: {
                         Label("导出 JSON…", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
                     }
-                    .studyFlowGlassButtonStyle()
+                    .studyFlowTransparentButtonStyle()
+                    .frame(maxWidth: .infinity)
 
                     Button {
                         exportData(to: .iCloudDrive)
                     } label: {
                         Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
                     }
-                    .studyFlowGlassButtonStyle(prominent: true)
-                    #else
-                    Button {
-                        exportData(to: .anywhere)
-                    } label: {
-                        Label("导出 JSON…", systemImage: "square.and.arrow.up")
-                    }
-                    .studyFlowGlassButtonStyle()
-                    .disabled(exporter == nil)
-
-                    Button {
-                        exportData(to: .iCloudDrive)
-                    } label: {
-                        Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
-                    }
-                    .studyFlowGlassButtonStyle(prominent: true)
-                    .disabled(exporter == nil)
-                    #endif
+                    .studyFlowTransparentButtonStyle()
+                    .frame(maxWidth: .infinity)
 
                     Button {
                         isImporting = true
                     } label: {
                         Label("导入 JSON…", systemImage: "square.and.arrow.down")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .multilineTextAlignment(.leading)
                     }
-                    .studyFlowGlassButtonStyle()
+                    .studyFlowTransparentButtonStyle()
+                    .frame(maxWidth: .infinity)
                 }
 
                 Text("导出包含科目、作业、子任务、时间块和提交方式历史；导入会用所选 JSON 覆盖当前数据。")
@@ -470,7 +372,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .platformSheetFrame(width: 560, height: 760)
+        .platformSheetFrame()
         .alert("设置", isPresented: Binding(get: { notice != nil }, set: { if !$0 { notice = nil } })) {
             Button("好") { notice = nil }
         } message: {
@@ -512,7 +414,6 @@ struct SettingsView: View {
         } message: {
             Text("导入会用文件中的数据覆盖当前科目、作业、子任务、时间块和提交方式记录。")
         }
-        #if os(iOS)
         .fileImporter(
             isPresented: $isChoosingCloudFolder,
             allowedContentTypes: [.folder],
@@ -545,9 +446,9 @@ struct SettingsView: View {
                 }
             }
         }
-        #endif
     }
 
+    /// 开启开关时请求日历权限，失败则回滚开关。
     private func requestCalendarAccessForAutomaticSync() {
         Task { @MainActor in
             do {
@@ -559,7 +460,6 @@ struct SettingsView: View {
         }
     }
 
-    #if os(iOS)
     private func setCloudFolder(_ url: URL) {
         defer { pendingFolderEnable = false }
         guard syncCoordinator.setFolder(url: url, context: context) else {
@@ -571,7 +471,6 @@ struct SettingsView: View {
             notice = syncCoordinator.lastMessage
         }
     }
-    #endif
 
     private var updateStatusText: String {
         switch updateState {
@@ -607,34 +506,19 @@ struct SettingsView: View {
     }
 
     @MainActor
+    /// 将数据导出到文件或 iCloud 云盘。
     private func exportData(to destination: DataExportService.Destination) {
         do {
             let data = try DataExportService.currentData(context: context)
-            #if os(iOS)
             exportDocument = JSONFileDocument(data: data)
             isExporting = true
-            #else
-            guard let exporter else {
-                exportNotice = "当前平台尚未配置 JSON 导出器。"
-                return
-            }
-            let didSave = try exporter.export(
-                data: data,
-                suggestedFileName: DataExportService.suggestedFileName(),
-                destination: destination.exportDestination
-            )
-            if didSave {
-                exportNotice = "导出成功。文件已写入所选位置。"
-            } else {
-                exportNotice = "已取消导出。"
-            }
-            #endif
         } catch {
             exportNotice = "导出失败：\(error.localizedDescription)"
         }
     }
 
     @MainActor
+    /// 读取并恢复用户选择的 JSON 文件。
     private func importData(from url: URL) {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {
@@ -653,7 +537,6 @@ struct SettingsView: View {
     }
 }
 
-#if os(iOS)
 struct JSONFileDocument: FileDocument {
     static var readableContentTypes: [UTType] { [.json] }
 
@@ -671,4 +554,3 @@ struct JSONFileDocument: FileDocument {
         FileWrapper(regularFileWithContents: data)
     }
 }
-#endif

@@ -19,7 +19,6 @@ struct IconPicker: View {
                 .buttonStyle(.borderless)
                 .foregroundStyle(selection == icon ? Color.accentColor : Color.primary)
                 .clipShape(RoundedRectangle(cornerRadius: 7))
-                .platformHelp(icon)
             }
         }
     }
@@ -47,7 +46,6 @@ struct ColorSwatchPicker: View {
                         }
                 }
                 .buttonStyle(.borderless)
-                .platformHelp(hex)
             }
         }
     }

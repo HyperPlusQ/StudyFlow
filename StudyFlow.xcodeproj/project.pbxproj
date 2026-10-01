@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 77;
+	objectVersion = 71;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -44,34 +44,10 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		800000000000000000000020 /* StudyFlowiOS */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			path = Sources/StudyFlowiOS;
-			sourceTree = "<group>";
-		};
-		800000000000000000000021 /* StudyFlowWidgets */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			path = Sources/StudyFlowWidgets;
-			sourceTree = "<group>";
-		};
-		800000000000000000000022 /* StudyFlowKit */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			path = Sources/StudyFlowKit;
-			sourceTree = "<group>";
-		};
-		800000000000000000000023 /* StudyFlowWidgetShared */ = {
-			isa = PBXFileSystemSynchronizedRootGroup;
-			exceptions = (
-			);
-			path = Sources/StudyFlowWidgetShared;
-			sourceTree = "<group>";
-		};
+		800000000000000000000020 /* Sources/StudyFlowiOS */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/StudyFlowiOS; sourceTree = "<group>"; };
+		800000000000000000000021 /* Sources/StudyFlowWidgets */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/StudyFlowWidgets; sourceTree = "<group>"; };
+		800000000000000000000022 /* Sources/StudyFlowKit */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/StudyFlowKit; sourceTree = "<group>"; };
+		800000000000000000000023 /* Sources/StudyFlowWidgetShared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Sources/StudyFlowWidgetShared; sourceTree = "<group>"; };
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -95,10 +71,10 @@
 		800000000000000000000002 = {
 			isa = PBXGroup;
 			children = (
-				800000000000000000000020 /* StudyFlowiOS */,
-				800000000000000000000021 /* StudyFlowWidgets */,
-				800000000000000000000022 /* StudyFlowKit */,
-				800000000000000000000023 /* StudyFlowWidgetShared */,
+				800000000000000000000020 /* Sources/StudyFlowiOS */,
+				800000000000000000000021 /* Sources/StudyFlowWidgets */,
+				800000000000000000000022 /* Sources/StudyFlowKit */,
+				800000000000000000000023 /* Sources/StudyFlowWidgetShared */,
 				800000000000000000000097 /* Configuration */,
 				800000000000000000000003 /* Products */,
 			);
@@ -142,9 +118,9 @@
 				800000000000000000000090 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				800000000000000000000020 /* StudyFlowiOS */,
-				800000000000000000000022 /* StudyFlowKit */,
-				800000000000000000000023 /* StudyFlowWidgetShared */,
+				800000000000000000000020 /* Sources/StudyFlowiOS */,
+				800000000000000000000022 /* Sources/StudyFlowKit */,
+				800000000000000000000023 /* Sources/StudyFlowWidgetShared */,
 			);
 			name = StudyFlow;
 			productName = StudyFlow;
@@ -164,8 +140,8 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				800000000000000000000021 /* StudyFlowWidgets */,
-				800000000000000000000023 /* StudyFlowWidgetShared */,
+				800000000000000000000021 /* Sources/StudyFlowWidgets */,
+				800000000000000000000023 /* Sources/StudyFlowWidgetShared */,
 			);
 			name = StudyFlowWidgets;
 			productName = StudyFlowWidgets;
@@ -367,8 +343,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 9U344M3SV2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Configuration/StudyFlow-Info.plist";
@@ -376,7 +352,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTS_MACCATALYST = NO;
@@ -393,8 +369,8 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlow.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 9U344M3SV2;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Configuration/StudyFlow-Info.plist";
@@ -402,7 +378,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SUPPORTS_MACCATALYST = NO;
@@ -418,8 +394,8 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlowWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 9U344M3SV2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Configuration/StudyFlowWidgets-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -427,7 +403,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow.StudyFlowWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -442,8 +418,8 @@
 				APPLICATION_EXTENSION_API_ONLY = YES;
 				CODE_SIGN_ENTITLEMENTS = Configuration/StudyFlowWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 7;
-				DEVELOPMENT_TEAM = "";
+				CURRENT_PROJECT_VERSION = 8;
+				DEVELOPMENT_TEAM = 9U344M3SV2;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "Configuration/StudyFlowWidgets-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -451,7 +427,7 @@
 					"@executable_path/Frameworks",
 					"@executable_path/../../Frameworks",
 				);
-				MARKETING_VERSION = 1.4.1;
+				MARKETING_VERSION = 1.4.2;
 				PRODUCT_BUNDLE_IDENTIFIER = com.openai.studyflow.StudyFlowWidgets;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
@@ -491,8 +467,6 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
-
-
 	};
 	rootObject = 800000000000000000000001 /* Project object */;
 }

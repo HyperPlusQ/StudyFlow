@@ -18,12 +18,11 @@ struct StudyFlowiOSApp: App {
             StudyFlowRootView()
                 .modelContainer(container)
                 .onAppear {
-                    // Ensure widgets have data even when the app is launched for the
-                    // first time after an OS restore or fresh install.
+                    // 系统恢复或全新安装后首次启动时，也为小组件生成数据。
                     WidgetSnapshotRefreshQueue.schedule(context: container.mainContext)
                 }
                 .onOpenURL { _ in
-                    // Widget taps simply bring StudyFlow to the foreground.
+                    // 点击小组件只需将 StudyFlow 带回前台。
                 }
         }
     }
@@ -31,6 +30,7 @@ struct StudyFlowiOSApp: App {
 
 @MainActor
 private enum WidgetSnapshotRefreshQueue {
+    /// 延迟刷新小组件共享数据。
     static func schedule(context: ModelContext) {
         DispatchQueue.main.async {
             StudyFlowWidgetBridge.refresh(context: context)

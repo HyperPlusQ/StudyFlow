@@ -1,4 +1,3 @@
-#if os(iOS)
 import SwiftData
 import SwiftUI
 
@@ -10,9 +9,7 @@ enum IOSTab: Hashable, CaseIterable {
     case settings
 }
 
-/// Android-style assignment scopes in a compact native segmented control.
-/// The bottom `TabView` still owns page switching, while this control keeps
-/// today/week/all/completed views one tap away without a sidebar.
+/// 使用原生分段控件切换作业范围，底部标签栏仍负责页面导航。
 struct IOSAssignmentsPage: View {
     let assignments: [Assignment]
     let subjects: [Subject]
@@ -47,8 +44,7 @@ struct IOSAssignmentsPage: View {
     }
 }
 
-/// Dedicated schedule destination matching the Android application's
-/// page-oriented navigation model.
+/// 独立日程页面，采用与安卓端一致的分页导航模型。
 struct ScheduleView: View {
     let blocks: [TimeBlock]
     let subjects: [Subject]
@@ -168,7 +164,7 @@ struct ScheduleView: View {
     }
 }
 
-/// Native iOS subject manager used by the bottom-bar destination.
+/// 底部标签栏使用的原生 iOS 科目管理页面。
 struct SubjectsView: View {
     @Binding var selection: SidebarSelection
     let subjects: [Subject]
@@ -202,8 +198,6 @@ struct SubjectsView: View {
                         subjectOutline(for: root, level: 0)
                     }
                 }
-            } header: {
-                Text("科目")
             }
         }
         .listStyle(.insetGrouped)
@@ -337,4 +331,3 @@ struct SubjectsView: View {
         .padding(.leading, CGFloat(level) * 20)
     }
 }
-#endif

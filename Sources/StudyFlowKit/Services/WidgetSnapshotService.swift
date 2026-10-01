@@ -2,10 +2,10 @@ import Foundation
 import SwiftData
 import WidgetKit
 
-/// Builds the widget payload after every successful SwiftData save so widgets
-/// stay aligned with the app without opening the main database.
+/// 每次保存 SwiftData 后生成小组件数据，使扩展无需打开主数据库。
 @MainActor
 enum WidgetSnapshotService {
+    /// 生成并保存最新的小组件数据快照。
     static func refresh(context: ModelContext) {
         do {
             let snapshot = try makeSnapshot(context: context)

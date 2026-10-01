@@ -128,11 +128,6 @@ struct AssignmentEditorView: View {
                         Text("4 · 较高").tag(4)
                         Text("5 · 最高").tag(5)
                     }
-                    LabeledContent("智能评分") {
-                        Text(scorePreview)
-                            .foregroundStyle(.secondary)
-                            .monospacedDigit()
-                    }
                 }
 
                 Section("提交方式") {
@@ -158,7 +153,6 @@ struct AssignmentEditorView: View {
                             }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
-                            .platformHelp("选择本科目曾经使用过的提交方式")
                         }
                     }
 
@@ -207,7 +201,7 @@ struct AssignmentEditorView: View {
             }
             .formStyle(.grouped)
             .navigationTitle(modeTitle)
-            .platformSheetFrame(width: 560, height: 640)
+            .platformSheetFrame()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消") { dismiss() }
@@ -224,17 +218,6 @@ struct AssignmentEditorView: View {
     private var modeTitle: String {
         if case .edit = mode { return "编辑作业" }
         return "新建作业"
-    }
-
-    private var scorePreview: String {
-        let draft = Assignment(
-            title: title,
-            dueDate: hasDueDate ? dueDate : nil,
-            priority: priority,
-            status: .active,
-            weight: weight
-        )
-        return "\(Int(SmartScoring.score(for: draft))) 分"
     }
 
     private func save() {

@@ -78,7 +78,6 @@ struct DashboardView: View {
             .padding(24)
         }
         .background(.clear)
-        .navigationTitle("仪表盘")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(action: onNewBlock) {
@@ -93,8 +92,6 @@ struct DashboardView: View {
         VStack(alignment: .leading, spacing: 5) {
             Text("学习概览")
                 .font(.largeTitle.bold())
-            Text("掌握时间投入、完成率与接下来最值得关注的作业。")
-                .foregroundStyle(.secondary)
         }
     }
 

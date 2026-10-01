@@ -6,13 +6,6 @@ enum DataExportService {
     enum Destination: Sendable {
         case anywhere
         case iCloudDrive
-
-        var exportDestination: StudyFlowExportDestination {
-            switch self {
-            case .anywhere: .anywhere
-            case .iCloudDrive: .iCloudDrive
-            }
-        }
     }
 
     private struct ExportDocument: Codable {
@@ -78,6 +71,7 @@ enum DataExportService {
         let lastUsedAt: Date
     }
 
+    /// 将当前数据库编码为 JSON 数据。
     @MainActor
     static func currentData(context: ModelContext) throws -> Data {
         try encodedDocument(
@@ -88,7 +82,7 @@ enum DataExportService {
         )
     }
 
-    /// Decodes and validates a complete snapshot before making any destructive database change.
+    /// 完整校验 JSON 快照后再恢复到当前数据库。
     @MainActor
     static func restore(data: Data, into context: ModelContext) throws {
         let decoder = JSONDecoder()
@@ -177,11 +171,16 @@ enum DataExportService {
 
         try context.save()
 
+        // 导入或云同步恢复后立即刷新共享快照，避免小组件继续显示旧数据。
+        ICloudSyncCoordinator.shared.refreshLocalSnapshotIfNeeded(context: context)
+        WidgetSnapshotService.refresh(context: context)
+
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach {
             NotificationManager.shared.schedule(for: $0)
         }
     }
 
+    /// 写入同步文件并保留指定修改时间。
     static func write(_ data: Data, to url: URL, modificationDate: Date? = nil) throws {
         let directory = url.deletingLastPathComponent()
         try FileManager.default.createDirectory(

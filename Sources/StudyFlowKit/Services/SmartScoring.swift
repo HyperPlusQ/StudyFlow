@@ -7,6 +7,7 @@ struct ScoredAssignment: Identifiable {
 }
 
 enum SmartScoring {
+    /// 按截止时间、优先级和权重计算关注分数。
     static func score(for assignment: Assignment, now: Date = .now) -> Double {
         guard !assignment.isCompleted else { return -1 }
 
@@ -37,6 +38,7 @@ enum SmartScoring {
         return max(0, score - checklistPenalty)
     }
 
+    /// 按关注分数和截止时间智能排序。
     static func sorted(_ assignments: [Assignment], now: Date = .now) -> [(assignment: Assignment, score: Double)] {
         assignments
             .map { ($0, score(for: $0, now: now)) }
