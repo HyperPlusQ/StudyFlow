@@ -27,11 +27,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Assignment
+import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.outlined.CalendarMonth
 import androidx.compose.material.icons.outlined.Layers
 import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.LibraryBooks
+import androidx.compose.material.icons.automirrored.outlined.LibraryBooks
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.FloatingActionButton
@@ -53,7 +53,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -264,7 +266,7 @@ private fun CompactLayout(
                 AppTab.ASSIGNMENTS -> FloatingActionButton(
                     onClick = onNewAssignment,
                     containerColor = MaterialTheme.colorScheme.primary
-                ) { Icon(Icons.Outlined.Assignment, "新建作业") }
+                ) { Icon(Icons.AutoMirrored.Outlined.Assignment, "新建作业") }
 
                 AppTab.SCHEDULE -> FloatingActionButton(
                     onClick = onNewTimeBlock,
@@ -319,13 +321,18 @@ private fun RowScope.BottomNavigationItem(
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
+                    role = Role.Tab,
                     onClick = onClick
-                ),
+                )
+                .semantics {
+                    this.contentDescription = contentDescription
+                    this.selected = selected
+                },
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
-                contentDescription = contentDescription,
+                contentDescription = null,
                 tint = if (selected) {
                     MaterialTheme.colorScheme.primary
                 } else {
@@ -363,7 +370,7 @@ private fun LargeLayout(
                 when (tab) {
                     AppTab.ASSIGNMENTS -> ExtendedFloatingActionButton(
                         onClick = onNewAssignment,
-                        icon = { Icon(Icons.Outlined.Assignment, null) },
+                        icon = { Icon(Icons.AutoMirrored.Outlined.Assignment, null) },
                         text = { Text("新建作业") }
                     )
                     AppTab.SCHEDULE -> ExtendedFloatingActionButton(
@@ -433,7 +440,7 @@ private fun SidebarContent(
                 containerColor = MaterialTheme.colorScheme.primary,
                 modifier = Modifier.size(56.dp)
             ) {
-                Icon(Icons.Outlined.Assignment, "新建作业")
+                Icon(Icons.AutoMirrored.Outlined.Assignment, "新建作业")
             }
             Spacer(Modifier.height(10.dp))
             if (onNewTimeBlock != null) {
@@ -504,8 +511,11 @@ private fun IconNavigationItem(
                 if (selected) MaterialTheme.colorScheme.primaryContainer
                 else Color.Transparent
             )
-            .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, role = Role.Button)
+            .semantics {
+                this.contentDescription = contentDescription
+                this.selected = selected
+            },
         contentAlignment = Alignment.Center
     ) {
         icon()
@@ -531,14 +541,17 @@ private fun SubjectFilterIcon(
     Box(
         Modifier
             .padding(horizontal = 16.dp, vertical = 5.dp)
-            .size(44.dp)
+            .size(48.dp)
             .clip(CircleShape)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer
                 else MaterialTheme.colorScheme.surfaceContainerHigh
             )
-            .semantics { this.contentDescription = contentDescription }
-            .clickable(onClick = onClick),
+            .clickable(onClick = onClick, role = Role.Button)
+            .semantics {
+                this.contentDescription = contentDescription
+                this.selected = selected
+            },
         contentAlignment = Alignment.Center
     ) {
         if (color == null) {
@@ -620,8 +633,8 @@ private fun AppContent(
 
 private fun tabIcon(tab: AppTab) = when (tab) {
     AppTab.DASHBOARD -> Icons.Outlined.Dashboard
-    AppTab.ASSIGNMENTS -> Icons.Outlined.Assignment
+    AppTab.ASSIGNMENTS -> Icons.AutoMirrored.Outlined.Assignment
     AppTab.SCHEDULE -> Icons.Outlined.CalendarMonth
-    AppTab.SUBJECTS -> Icons.Outlined.LibraryBooks
+    AppTab.SUBJECTS -> Icons.AutoMirrored.Outlined.LibraryBooks
     AppTab.SETTINGS -> Icons.Outlined.Settings
 }
