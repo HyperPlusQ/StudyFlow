@@ -164,6 +164,8 @@ struct AssignmentDetailView: View {
                             }
                             .buttonStyle(.borderless)
                             .foregroundStyle(.tertiary)
+                            .help("删除子任务")
+                            .accessibilityLabel("删除子任务“\(subtask.title)”")
                         }
                         .padding(.vertical, 7)
                         Divider()
@@ -206,6 +208,8 @@ struct AssignmentDetailView: View {
                         }
                         .buttonStyle(.borderless)
                         .foregroundStyle(.tertiary)
+                        .help("删除时间块")
+                        .accessibilityLabel("删除时间块“\(block.title)”")
                     }
                     .padding(.vertical, 5)
                 }

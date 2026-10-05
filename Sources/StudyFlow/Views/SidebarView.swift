@@ -55,6 +55,7 @@ struct SidebarView: View {
                     }
                     .buttonStyle(.borderless)
                     .help("新建科目")
+                    .accessibilityLabel("新建科目")
                 }
             }
         }

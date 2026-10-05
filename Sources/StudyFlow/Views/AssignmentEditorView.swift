@@ -188,6 +188,8 @@ struct AssignmentEditorView: View {
                             }
                             .buttonStyle(.borderless)
                             .foregroundStyle(.secondary)
+                            .help("删除子任务")
+                            .accessibilityLabel("删除子任务")
                         }
                     }
                     .onDelete { subtasks.remove(atOffsets: $0) }

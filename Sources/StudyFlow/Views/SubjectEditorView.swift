@@ -84,6 +84,7 @@ struct SubjectEditorView: View {
                                     }
                                     .buttonStyle(.borderless)
                                     .help("从本科目的历史记录中删除")
+                                    .accessibilityLabel("删除提交记录“\(entry.value)”")
                                 }
                             }
                         }

@@ -18,6 +18,7 @@ struct SubmissionMethodView: View {
                 .foregroundStyle(.tint)
             }
             .buttonStyle(.plain)
+            .accessibilityHint(helpText(for: target))
             .help(helpText(for: target))
         } else if value.isEmpty {
             if compact {

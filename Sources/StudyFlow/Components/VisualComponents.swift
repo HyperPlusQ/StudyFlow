@@ -16,6 +16,30 @@ extension Color {
         }
         self.init(red: r, green: g, blue: b)
     }
+
+    /// 根据十六进制背景的相对亮度选择对比度更高的前景色，避免浅色背景上的固定白色不可读。
+    static func readableForeground(onHex hex: String) -> Color {
+        let cleaned = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        guard cleaned.count == 6 else { return .primary }
+
+        var value: UInt64 = 0
+        guard Scanner(string: cleaned).scanHexInt64(&value) else { return .primary }
+
+        func linearized(_ component: Double) -> Double {
+            component <= 0.04045
+                ? component / 12.92
+                : pow((component + 0.055) / 1.055, 2.4)
+        }
+
+        let red = linearized(Double((value >> 16) & 0xFF) / 255)
+        let green = linearized(Double((value >> 8) & 0xFF) / 255)
+        let blue = linearized(Double(value & 0xFF) / 255)
+        let luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+        let contrastWithWhite = 1.05 / (luminance + 0.05)
+        let contrastWithBlack = (luminance + 0.05) / 0.05
+        return contrastWithWhite >= contrastWithBlack ? .white : .black
+    }
 }
 
 extension Date {
@@ -98,6 +122,7 @@ struct ProgressBar: View {
             }
         }
         .frame(height: 5)
+        .accessibilityLabel("完成进度")
         .accessibilityValue("\(Int(progress * 100))%")
     }
 }
@@ -145,9 +170,10 @@ struct EmptyStateView: View {
     var body: some View {
         VStack(spacing: 14) {
             SafeSystemImage(systemName: symbol, fallback: "tray")
-                .font(.system(size: 44, weight: .light))
+                .font(.system(.largeTitle, design: .default).weight(.light))
                 .foregroundStyle(.tertiary)
                 .symbolRenderingMode(.hierarchical)
+                .accessibilityHidden(true)
             Text(title).font(.title2.weight(.semibold))
             Text(message)
                 .font(.callout)
