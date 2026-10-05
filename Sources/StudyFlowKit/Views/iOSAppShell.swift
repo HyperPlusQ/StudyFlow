@@ -306,6 +306,8 @@ struct SubjectsView: View {
                     .foregroundStyle(.secondary)
             }
             .buttonStyle(.borderless)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
             .accessibilityLabel("编辑“\(subject.name)”")
         }
         .padding(.vertical, 3)

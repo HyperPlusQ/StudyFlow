@@ -259,13 +259,26 @@ struct AssignmentRow: View {
                     .symbolRenderingMode(.hierarchical)
             }
             .buttonStyle(.plain)
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+            .accessibilityLabel(assignment.isCompleted ? "恢复进行中" : "标记为已完成")
 
             if let rank, rank <= 5 {
                 Text("\(rank)")
                     .font(.caption2.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 19, height: 19)
-                    .background(rank == 1 ? Color.orange : Color.accentColor, in: Circle())
+                    .background(
+                        (rank == 1 ? Color.orange : Color.accentColor).opacity(0.18),
+                        in: Circle()
+                    )
+                    .overlay(
+                        Circle().strokeBorder(
+                            rank == 1 ? Color.orange : Color.accentColor,
+                            lineWidth: 1
+                        )
+                    )
+                    .accessibilityLabel("智能排序第 \(rank) 名")
             }
 
             VStack(alignment: .leading, spacing: 7) {

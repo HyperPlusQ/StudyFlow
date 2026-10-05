@@ -149,10 +149,12 @@ struct AssignmentEditorView: View {
                                 Text("在“编辑科目”中可删除历史记录")
                             } label: {
                                 Image(systemName: "chevron.down.circle")
-                                    .frame(width: 22, height: 22)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
                             }
                             .menuStyle(.borderlessButton)
                             .fixedSize()
+                            .accessibilityLabel("选择历史提交方式")
                         }
                     }
 
@@ -181,7 +183,10 @@ struct AssignmentEditorView: View {
                                 Image(systemName: "minus.circle")
                             }
                             .buttonStyle(.borderless)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                             .foregroundStyle(.secondary)
+                            .accessibilityLabel("删除子任务")
                         }
                     }
                     .onDelete { subtasks.remove(atOffsets: $0) }

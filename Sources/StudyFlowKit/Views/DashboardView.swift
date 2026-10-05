@@ -139,7 +139,7 @@ struct DashboardView: View {
                         innerRadius: .ratio(0.62),
                         angularInset: 1.5
                     )
-                    .foregroundStyle(item.subject.map { Color(hex: $0.colorHex) } ?? Color.gray)
+                    .foregroundStyle(item.subject.map { Color(hex: $0.colorHex) } ?? .secondary)
                     .cornerRadius(4)
                 }
                 .frame(height: 235)
@@ -147,7 +147,7 @@ struct DashboardView: View {
                     ForEach(subjectTime.prefix(4), id: \.subject?.id) { item in
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(item.subject.map { Color(hex: $0.colorHex) } ?? .gray)
+                                .fill(item.subject.map { Color(hex: $0.colorHex) } ?? .secondary)
                                 .frame(width: 8, height: 8)
                             Text(item.subject?.name ?? "未分类")
                                 .font(.caption)

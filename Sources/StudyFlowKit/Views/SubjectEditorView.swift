@@ -83,6 +83,9 @@ struct SubjectEditorView: View {
                                         Image(systemName: "trash")
                                     }
                                     .buttonStyle(.borderless)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(Rectangle())
+                                    .accessibilityLabel("删除提交记录“\(entry.value)”")
                                 }
                             }
                         }

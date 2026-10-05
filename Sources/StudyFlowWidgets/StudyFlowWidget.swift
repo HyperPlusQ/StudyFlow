@@ -276,9 +276,18 @@ private struct StudyFlowWidgetView: View {
             HStack(spacing: 6) {
                 Text("\(rank)")
                     .font(.caption2.bold())
-                    .foregroundStyle(.white)
+                    .foregroundStyle(.primary)
                     .frame(width: 17, height: 17)
-                    .background(rank == 1 ? Color.orange : Color.accentColor, in: Circle())
+                    .background(
+                        (rank == 1 ? Color.orange : Color.accentColor).opacity(0.18),
+                        in: Circle()
+                    )
+                    .overlay(
+                        Circle().strokeBorder(
+                            rank == 1 ? Color.orange : Color.accentColor,
+                            lineWidth: 1
+                        )
+                    )
                 Text(item.subject)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.tint)

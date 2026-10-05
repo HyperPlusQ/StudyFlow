@@ -163,7 +163,10 @@ struct AssignmentDetailView: View {
                                 Image(systemName: "minus.circle")
                             }
                             .buttonStyle(.borderless)
+                            .frame(width: 44, height: 44)
+                            .contentShape(Rectangle())
                             .foregroundStyle(.tertiary)
+                            .accessibilityLabel("删除子任务“\(subtask.title)”")
                         }
                         .padding(.vertical, 7)
                         Divider()
@@ -205,7 +208,10 @@ struct AssignmentDetailView: View {
                             Image(systemName: "trash")
                         }
                         .buttonStyle(.borderless)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
                         .foregroundStyle(.tertiary)
+                        .accessibilityLabel("删除时间块“\(block.title)”")
                     }
                     .padding(.vertical, 5)
                 }
