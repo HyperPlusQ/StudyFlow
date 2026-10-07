@@ -40,6 +40,10 @@ final class Subject {
     var parentId: UUID?
     var sortOrder: Int
     var createdAt: Date
+    /// 距上一次登记作业多少天后提醒用户再次登记，nil 表示关闭。
+    var assignmentIntervalDays: Int?
+    /// 最近一次新建属于本科目作业的时间，用于布置间隔提醒。
+    var lastAssignmentRegisteredAt: Date?
 
     init(
         id: UUID = UUID(),
@@ -48,7 +52,9 @@ final class Subject {
         colorHex: String = "#4F7DF3",
         parentId: UUID? = nil,
         sortOrder: Int = 0,
-        createdAt: Date = .now
+        createdAt: Date = .now,
+        assignmentIntervalDays: Int? = nil,
+        lastAssignmentRegisteredAt: Date? = nil
     ) {
         self.id = id
         self.name = name
@@ -57,6 +63,8 @@ final class Subject {
         self.parentId = parentId
         self.sortOrder = sortOrder
         self.createdAt = createdAt
+        self.assignmentIntervalDays = assignmentIntervalDays
+        self.lastAssignmentRegisteredAt = lastAssignmentRegisteredAt
     }
 }
 
@@ -79,6 +87,8 @@ final class Assignment {
 
     @Relationship(deleteRule: .cascade, inverse: \Subtask.assignment)
     var subtasks: [Subtask]
+    @Relationship(deleteRule: .cascade, inverse: \ImageAttachment.assignment)
+    var attachments: [ImageAttachment]
 
     init(
         id: UUID = UUID(),
@@ -95,7 +105,8 @@ final class Assignment {
         updatedAt: Date = .now,
         completedAt: Date? = nil,
         calendarEventIdentifier: String? = nil,
-        subtasks: [Subtask] = []
+        subtasks: [Subtask] = [],
+        attachments: [ImageAttachment] = []
     ) {
         self.id = id
         self.title = title
@@ -112,6 +123,7 @@ final class Assignment {
         self.completedAt = completedAt
         self.calendarEventIdentifier = calendarEventIdentifier
         self.subtasks = subtasks
+        self.attachments = attachments
     }
 
     var status: AssignmentStatus {
@@ -153,6 +165,32 @@ final class Subtask {
         self.title = title
         self.isCompleted = isCompleted
         self.sortOrder = sortOrder
+        self.assignment = assignment
+    }
+}
+
+@Model
+final class ImageAttachment {
+    @Attribute(.unique) var id: UUID
+    var fileName: String
+    var mimeType: String
+    var imageData: Data
+    var createdAt: Date
+    var assignment: Assignment?
+
+    init(
+        id: UUID = UUID(),
+        fileName: String,
+        mimeType: String,
+        imageData: Data,
+        createdAt: Date = .now,
+        assignment: Assignment? = nil
+    ) {
+        self.id = id
+        self.fileName = fileName
+        self.mimeType = mimeType
+        self.imageData = imageData
+        self.createdAt = createdAt
         self.assignment = assignment
     }
 }

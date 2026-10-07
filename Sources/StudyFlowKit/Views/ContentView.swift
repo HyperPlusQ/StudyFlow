@@ -35,6 +35,10 @@ struct ContentView: View {
         .task {
             syncCoordinator.performLaunchSyncIfNeeded(context: context)
             await NotificationManager.shared.requestAuthorization()
+            NotificationManager.scheduleAllSubjectReminders(
+                subjects: subjects,
+                assignments: assignments
+            )
         }
         .onReceive(
             Timer.publish(every: 30, on: .main, in: .common).autoconnect()
@@ -326,13 +330,13 @@ struct SettingsView: View {
 
             Section("备份与 iCloud") {
                 LabeledContent("存储方式") { Text("SwiftData 本地存储") }
-                LabeledContent("云盘备份") { Text("iCloud 云盘 JSON 导出") }
+                LabeledContent("云盘备份") { Text("iCloud 云盘 ZIP 备份") }
 
                 VStack(alignment: .leading, spacing: 10) {
                     Button {
                         exportData(to: .anywhere)
                     } label: {
-                        Label("导出 JSON…", systemImage: "square.and.arrow.up")
+                        Label("导出 ZIP 备份…", systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
                     }
@@ -342,7 +346,7 @@ struct SettingsView: View {
                     Button {
                         exportData(to: .iCloudDrive)
                     } label: {
-                        Label("导出到 iCloud 云盘…", systemImage: "icloud.and.arrow.up")
+                        Label("导出到 iCloud 云盘（ZIP）…", systemImage: "icloud.and.arrow.up")
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
                     }
@@ -352,7 +356,7 @@ struct SettingsView: View {
                     Button {
                         isImporting = true
                     } label: {
-                        Label("导入 JSON…", systemImage: "square.and.arrow.down")
+                        Label("导入 ZIP/JSON…", systemImage: "square.and.arrow.down")
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .multilineTextAlignment(.leading)
                     }
@@ -360,7 +364,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
                 }
 
-                Text("导出包含科目、作业、子任务、时间块和提交方式历史；导入会用所选 JSON 覆盖当前数据。")
+                Text("ZIP 备份包含科目、作业、子任务、时间块、提交方式历史和图片附件；仍兼容旧版 JSON。")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -385,7 +389,7 @@ struct SettingsView: View {
         }
         .fileImporter(
             isPresented: $isImporting,
-            allowedContentTypes: [.json],
+            allowedContentTypes: [.zip, .json],
             allowsMultipleSelection: false
         ) { result in
             switch result {
@@ -396,7 +400,7 @@ struct SettingsView: View {
             }
         }
         .alert(
-            "导入 JSON",
+            "导入 ZIP/JSON",
             isPresented: Binding(
                 get: { pendingImportURL != nil },
                 set: { if !$0 { pendingImportURL = nil } }
@@ -412,7 +416,7 @@ struct SettingsView: View {
                 pendingImportURL = nil
             }
         } message: {
-            Text("导入会用文件中的数据覆盖当前科目、作业、子任务、时间块和提交方式记录。")
+            Text("导入会用文件中的数据覆盖当前科目、作业、子任务、时间块、提交方式记录和图片附件。")
         }
         .fileImporter(
             isPresented: $isChoosingCloudFolder,
@@ -432,7 +436,7 @@ struct SettingsView: View {
         .fileExporter(
             isPresented: $isExporting,
             document: exportDocument,
-            contentType: .json,
+            contentType: .zip,
             defaultFilename: DataExportService.suggestedFileName()
         ) { result in
             switch result {
@@ -518,7 +522,7 @@ struct SettingsView: View {
     }
 
     @MainActor
-    /// 读取并恢复用户选择的 JSON 文件。
+    /// 读取并恢复用户选择的 ZIP 或旧版 JSON 文件。
     private func importData(from url: URL) {
         let accessing = url.startAccessingSecurityScopedResource()
         defer {
@@ -538,7 +542,7 @@ struct SettingsView: View {
 }
 
 struct JSONFileDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.json] }
+    static var readableContentTypes: [UTType] { [.zip, .json] }
 
     var data: Data
 

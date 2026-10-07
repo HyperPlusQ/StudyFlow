@@ -1,5 +1,7 @@
 import SwiftData
 import SwiftUI
+import UIKit
+import UniformTypeIdentifiers
 
 private struct DraftSubtask: Identifiable, Equatable {
     let id: UUID
@@ -11,6 +13,14 @@ private struct DraftSubtask: Identifiable, Equatable {
         self.title = title
         self.isCompleted = isCompleted
     }
+}
+
+/// 作业图片附件的编辑态，保存时再写入 SwiftData。
+private struct DraftAttachment: Identifiable, Equatable {
+    let id: UUID
+    let fileName: String
+    let mimeType: String
+    let imageData: Data
 }
 
 struct AssignmentEditorView: View {
@@ -37,6 +47,8 @@ struct AssignmentEditorView: View {
     @State private var weight: Int
     @State private var reminderLeadHours: Int
     @State private var subtasks: [DraftSubtask]
+    @State private var attachments: [DraftAttachment]
+    @State private var isImportingAttachments = false
 
     init(mode: Mode, subjects: [Subject]) {
         self.mode = mode
@@ -53,6 +65,7 @@ struct AssignmentEditorView: View {
             _weight = State(initialValue: 3)
             _reminderLeadHours = State(initialValue: 24)
             _subtasks = State(initialValue: [])
+            _attachments = State(initialValue: [])
         case let .edit(assignment):
             _title = State(initialValue: assignment.title)
             _details = State(initialValue: assignment.details)
@@ -66,6 +79,16 @@ struct AssignmentEditorView: View {
             _subtasks = State(initialValue: assignment.subtasks
                 .sorted { $0.sortOrder < $1.sortOrder }
                 .map { DraftSubtask(id: $0.id, title: $0.title, isCompleted: $0.isCompleted) })
+            _attachments = State(initialValue: assignment.attachments
+                .sorted { $0.createdAt < $1.createdAt }
+                .map {
+                    DraftAttachment(
+                        id: $0.id,
+                        fileName: $0.fileName,
+                        mimeType: $0.mimeType,
+                        imageData: $0.imageData
+                    )
+                })
         }
     }
 
@@ -170,6 +193,49 @@ struct AssignmentEditorView: View {
                 }
 
                 Section {
+                    if attachments.isEmpty {
+                        Text("可添加题目截图、草稿或参考图片。")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 10) {
+                                ForEach(attachments) { attachment in
+                                    AttachmentDraftThumbnail(
+                                        attachment: attachment,
+                                        onDelete: {
+                                            attachments.removeAll { $0.id == attachment.id }
+                                        }
+                                    )
+                                }
+                            }
+                            .padding(.vertical, 2)
+                        }
+                    }
+
+                    Button {
+                        isImportingAttachments = true
+                    } label: {
+                        Label("添加图片附件…", systemImage: "photo.badge.plus")
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                    }
+                    .studyFlowGlassButtonStyle()
+                    .fileImporter(
+                        isPresented: $isImportingAttachments,
+                        allowedContentTypes: [.image],
+                        allowsMultipleSelection: true
+                    ) { result in
+                        importAttachments(from: result)
+                    }
+                } header: {
+                    Text("图片附件")
+                } footer: {
+                    Text("图片会随 ZIP 备份和 iCloud 同步一起保存。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
                     ForEach($subtasks) { $subtask in
                         HStack {
                             Toggle("", isOn: $subtask.isCompleted)
@@ -258,10 +324,100 @@ struct AssignmentEditorView: View {
         }
 
         reconcileSubtasks(for: assignment)
+        reconcileAttachments(for: assignment)
+        updateSubjectRegistration(for: assignment)
         PersistentStore.save(context)
         NotificationManager.shared.schedule(for: assignment)
+        NotificationManager.scheduleAllSubjectReminders(
+            subjects: subjects,
+            assignments: allAssignments(including: assignment)
+        )
         synchronizeCalendarAfterSave(for: assignment)
         dismiss()
+    }
+
+    /// 仅读取当前上下文中的作业，用于刷新全部科目的布置提醒。
+    private func allAssignments(including assignment: Assignment) -> [Assignment] {
+        var result = ((try? context.fetch(FetchDescriptor<Assignment>())) ?? [])
+        if !result.contains(where: { $0.id == assignment.id }) {
+            result.append(assignment)
+        }
+        return result
+    }
+
+    /// 新建作业或将作业移动到另一科目时，重置该科目的登记计时。
+    private func updateSubjectRegistration(for assignment: Assignment) {
+        let isNew: Bool
+        if case .new = mode { isNew = true } else { isNew = false }
+
+        if isNew, let id = subjectId {
+            if let subject = subjects.first(where: { $0.id == id }) {
+                subject.lastAssignmentRegisteredAt = assignment.createdAt
+            }
+            return
+        }
+
+        guard case let .edit(existing) = mode, existing.subjectId != subjectId else { return }
+        if let oldID = existing.subjectId,
+           let oldSubject = subjects.first(where: { $0.id == oldID }) {
+            NotificationManager.shared.cancelSubjectReminder(for: oldSubject.id)
+        }
+        if let newID = subjectId,
+           let newSubject = subjects.first(where: { $0.id == newID }) {
+            newSubject.lastAssignmentRegisteredAt = .now
+        }
+    }
+
+    private func reconcileAttachments(for assignment: Assignment) {
+        let existingByID = Dictionary(
+            uniqueKeysWithValues: assignment.attachments.map { ($0.id, $0) }
+        )
+        let retainedIDs = Set(attachments.map(\.id))
+        for draft in attachments where existingByID[draft.id] == nil {
+            let attachment = ImageAttachment(
+                id: draft.id,
+                fileName: draft.fileName,
+                mimeType: draft.mimeType,
+                imageData: draft.imageData,
+                assignment: assignment
+            )
+            context.insert(attachment)
+        }
+        for existing in assignment.attachments where !retainedIDs.contains(existing.id) {
+            context.delete(existing)
+        }
+    }
+
+    /// 读取系统选择器返回的图片并加入附件草稿。
+    private func importAttachments(from result: Result<[URL], Error>) {
+        guard case let .success(urls) = result else { return }
+        for url in urls {
+            guard url.startAccessingSecurityScopedResource() else { continue }
+            defer { url.stopAccessingSecurityScopedResource() }
+            guard let data = try? Data(contentsOf: url), !data.isEmpty else { continue }
+            let fileName = url.lastPathComponent
+            let mimeType = Self.mimeType(forExtension: url.pathExtension)
+            guard !attachments.contains(where: { $0.fileName == fileName && $0.imageData == data }) else { continue }
+            attachments.append(
+                DraftAttachment(
+                    id: UUID(),
+                    fileName: fileName,
+                    mimeType: mimeType,
+                    imageData: data
+                )
+            )
+        }
+    }
+
+    private static func mimeType(forExtension ext: String) -> String {
+        switch ext.lowercased() {
+        case "png": "image/png"
+        case "gif": "image/gif"
+        case "heic", "heif": "image/heic"
+        case "webp": "image/webp"
+        case "bmp": "image/bmp"
+        default: "image/jpeg"
+        }
     }
 
     @MainActor
@@ -310,6 +466,48 @@ struct AssignmentEditorView: View {
 
         for existing in assignment.subtasks where !retainedIds.contains(existing.id) {
             context.delete(existing)
+        }
+    }
+}
+
+
+/// 附件编辑器中的缩略图和原生删除按钮，触控区域不小于 44×44。
+private struct AttachmentDraftThumbnail: View {
+    let attachment: DraftAttachment
+    let onDelete: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            if let image = UIImage(data: attachment.imageData) {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.secondary.opacity(0.12))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    }
+            }
+        }
+        .frame(width: 76, height: 76)
+        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14)
+                .strokeBorder(Color.primary.opacity(0.08))
+        }
+        .overlay(alignment: .bottomTrailing) {
+            Button(action: onDelete) {
+                Image(systemName: "xmark.circle.fill")
+                    .symbolRenderingMode(.palette)
+                    .foregroundStyle(.white, Color.black.opacity(0.55))
+                    .font(.title3)
+                    .frame(width: 44, height: 44, alignment: .bottomTrailing)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("删除附件“\(attachment.fileName)”")
         }
     }
 }

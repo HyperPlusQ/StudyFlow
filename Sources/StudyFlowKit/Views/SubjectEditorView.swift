@@ -14,6 +14,8 @@ struct SubjectEditorView: View {
     @State private var symbol: String
     @State private var colorHex: String
     @State private var parentId: UUID?
+    @State private var reminderEnabled: Bool
+    @State private var assignmentIntervalDays: Int
 
     private static let availableIcons = [
         "book.closed", "function", "atom", "flask", "globe", "paintbrush", "music.note",
@@ -32,6 +34,8 @@ struct SubjectEditorView: View {
         _symbol = State(initialValue: PlatformSymbolAvailability.resolve(existing?.symbol))
         _colorHex = State(initialValue: existing?.colorHex ?? "#4F7DF3")
         _parentId = State(initialValue: existing?.parentId)
+        _reminderEnabled = State(initialValue: existing?.assignmentIntervalDays != nil)
+        _assignmentIntervalDays = State(initialValue: existing?.assignmentIntervalDays ?? 7)
     }
 
     private var historyEntries: [SubmissionHistoryEntry] {
@@ -62,6 +66,31 @@ struct SubjectEditorView: View {
                         }
                     }
                     Text(parentId == nil ? "该科目显示在侧边栏顶层。" : "该科目将作为子科目嵌套显示。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section {
+                    Toggle("作业布置间隔提醒", isOn: $reminderEnabled)
+                    if reminderEnabled {
+                        LabeledContent("间隔天数") {
+                            HStack(spacing: 8) {
+                                Text("\(assignmentIntervalDays) 天")
+                                    .monospacedDigit()
+                                Stepper(
+                                    "作业布置间隔",
+                                    value: $assignmentIntervalDays,
+                                    in: 1...365
+                                )
+                                .labelsHidden()
+                                .fixedSize()
+                            }
+                        }
+                    }
+                } header: {
+                    Text("作业布置间隔")
+                } footer: {
+                    Text("从最近登记属于该科目作业的时间起计算；超过设定天数仍未登记新作业时发送通知。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -111,22 +140,41 @@ struct SubjectEditorView: View {
 
     private func save() {
         let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let intervalDays = reminderEnabled ? assignmentIntervalDays : nil
+        var savedSubject = existing
         if let existing {
             existing.name = cleanName
             existing.symbol = PlatformSymbolAvailability.resolve(symbol)
             existing.colorHex = colorHex
             existing.parentId = parentId
+            existing.assignmentIntervalDays = intervalDays
+            savedSubject = existing
         } else {
             let subject = Subject(
                 name: cleanName,
                 symbol: PlatformSymbolAvailability.resolve(symbol),
                 colorHex: colorHex,
                 parentId: parentId,
-                sortOrder: (subjects.filter { $0.parentId == parentId }.map(\.sortOrder).max() ?? -1) + 1
+                sortOrder: (subjects.filter { $0.parentId == parentId }.map(\.sortOrder).max() ?? -1) + 1,
+                assignmentIntervalDays: intervalDays
             )
             context.insert(subject)
+            savedSubject = subject
         }
         PersistentStore.save(context)
+
+        var updatedSubjects = subjects
+        if let savedSubject, !updatedSubjects.contains(where: { $0.id == savedSubject.id }) {
+            updatedSubjects.append(savedSubject)
+        } else if let savedSubject,
+                  let index = updatedSubjects.firstIndex(where: { $0.id == savedSubject.id }) {
+            updatedSubjects[index] = savedSubject
+        }
+        let assignments = ((try? context.fetch(FetchDescriptor<Assignment>())) ?? [])
+        NotificationManager.scheduleAllSubjectReminders(
+            subjects: updatedSubjects,
+            assignments: assignments
+        )
         dismiss()
     }
 }

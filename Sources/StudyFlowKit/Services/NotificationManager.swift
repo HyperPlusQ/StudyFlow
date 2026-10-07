@@ -51,6 +51,67 @@ final class NotificationManager: @unchecked Sendable {
             .removePendingNotificationRequests(withIdentifiers: ["assignment-\(id.uuidString)"])
     }
 
+
+    /// 按科目的作业布置间隔创建下一次登记提醒。
+    func scheduleSubjectReminder(subject: Subject, latestAssignmentCreatedAt: Date?) {
+        cancelSubjectReminder(for: subject.id)
+        guard let days = subject.assignmentIntervalDays, days > 0 else { return }
+
+        let registeredAt = subject.lastAssignmentRegisteredAt
+            ?? latestAssignmentCreatedAt
+            ?? subject.createdAt
+        guard let targetDate = Calendar.current.date(
+            byAdding: .day,
+            value: days,
+            to: registeredAt
+        ) else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "该登记作业了"
+        content.body = "“\(subject.name)”距离上一次登记作业已过 \(days) 天。"
+        content.sound = .default
+        content.userInfo = ["subjectID": subject.id.uuidString]
+
+        let request = UNNotificationRequest(
+            identifier: "subject-reminder-\(subject.id.uuidString)",
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(
+                timeInterval: max(1, targetDate.timeIntervalSinceNow),
+                repeats: false
+            )
+        )
+        UNUserNotificationCenter.current().add(request)
+    }
+
+    /// 启动、导入、同步和保存后统一刷新所有科目的布置提醒。
+    static func scheduleAllSubjectReminders(
+        subjects: [Subject],
+        assignments: [Assignment]
+    ) {
+        var latestBySubject: [UUID: Date] = [:]
+        for assignment in assignments {
+            guard let subjectID = assignment.subjectId else { continue }
+            latestBySubject[subjectID] = max(
+                latestBySubject[subjectID] ?? .distantPast,
+                assignment.createdAt
+            )
+        }
+        for subject in subjects {
+            shared.scheduleSubjectReminder(
+                subject: subject,
+                latestAssignmentCreatedAt: latestBySubject[subject.id]
+            )
+        }
+    }
+
+    /// 取消指定科目的作业布置提醒。
+    func cancelSubjectReminder(for id: UUID) {
+        UNUserNotificationCenter.current()
+            .removePendingNotificationRequests(
+                withIdentifiers: ["subject-reminder-\(id.uuidString)"]
+            )
+    }
+
     private func formatRelativeDue(_ date: Date) -> String {
         let formatter = DateFormatter()
         formatter.locale = Locale(identifier: "zh_CN")

@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 struct AssignmentListView: View {
     let scope: SidebarSelection
@@ -320,6 +321,10 @@ struct AssignmentRow: View {
                     .font(.caption2)
                     .foregroundStyle(assignment.priority == .critical ? .red : .secondary)
                 }
+
+                if !assignment.attachments.isEmpty {
+                    AssignmentAttachmentThumbnails(attachments: assignment.attachments)
+                }
             }
         }
         .padding(.vertical, 3)
@@ -446,6 +451,49 @@ private struct FilterCard<Content: View>: View {
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+}
+
+
+/// 作业行内的图片附件缩略图，最多展示三张并以数量角标表示剩余附件。
+private struct AssignmentAttachmentThumbnails: View {
+    let attachments: [ImageAttachment]
+
+    private var sortedAttachments: [ImageAttachment] {
+        attachments.sorted { $0.createdAt < $1.createdAt }
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(sortedAttachments.prefix(3), id: \.id) { attachment in
+                Group {
+                    if let image = UIImage(data: attachment.imageData) {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Image(systemName: "photo")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .frame(width: 38, height: 38)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(Color.primary.opacity(0.1))
+                }
+                .accessibilityLabel("附件：\(attachment.fileName)")
+            }
+
+            if sortedAttachments.count > 3 {
+                Text("+\(sortedAttachments.count - 3)")
+                    .font(.caption2.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(minWidth: 38, minHeight: 38)
+                    .background(Color.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 8))
+                    .accessibilityLabel("还有 \(sortedAttachments.count - 3) 张附件")
+            }
         }
     }
 }

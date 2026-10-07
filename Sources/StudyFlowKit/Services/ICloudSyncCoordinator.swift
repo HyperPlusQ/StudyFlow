@@ -8,7 +8,7 @@ import SwiftData
 final class ICloudSyncCoordinator {
     static let shared = ICloudSyncCoordinator()
 
-    static let fileName = "StudyFlow-Sync.json"
+    static let fileName = "StudyFlow-Sync.zip"
 
     private enum Key {
         static let enabled = "iCloudSyncEnabled"
