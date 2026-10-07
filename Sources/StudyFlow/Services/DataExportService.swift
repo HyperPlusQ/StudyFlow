@@ -34,6 +34,8 @@ enum DataExportService {
         let parentId: UUID?
         let sortOrder: Int
         let createdAt: Date
+        let assignmentIntervalDays: Int?
+        let lastAssignmentRegisteredAt: Date?
     }
 
     private struct AssignmentRecord: Codable {
@@ -52,6 +54,8 @@ enum DataExportService {
         let completedAt: Date?
         let calendarEventIdentifier: String?
         let subtasks: [SubtaskRecord]
+        /// 可选字段以兼容旧版纯 JSON 备份。
+        let attachments: [AttachmentRecord]?
     }
 
     private struct SubtaskRecord: Codable {
@@ -59,6 +63,14 @@ enum DataExportService {
         let title: String
         let isCompleted: Bool
         let sortOrder: Int
+    }
+
+    private struct AttachmentRecord: Codable {
+        let id: UUID
+        let fileName: String
+        let mimeType: String
+        let imageData: Data
+        let createdAt: Date
     }
 
     private struct TimeBlockRecord: Codable {
@@ -88,11 +100,14 @@ enum DataExportService {
         destination: Destination
     ) throws {
         guard let url = chooseDestination(for: destination) else { return }
-        let data = try encodedDocument(
-            subjects: subjects,
-            assignments: assignments,
-            timeBlocks: timeBlocks,
-            submissionHistory: submissionHistory
+        let data = try archive(
+            json: try encodedDocument(
+                subjects: subjects,
+                assignments: assignments,
+                timeBlocks: timeBlocks,
+                submissionHistory: submissionHistory
+            ),
+            assignments: assignments
         )
         try write(data, to: url)
     }
@@ -100,11 +115,18 @@ enum DataExportService {
     @MainActor
     /// 将当前数据库编码为 JSON 数据。
     static func currentData(context: ModelContext) throws -> Data {
-        try encodedDocument(
-            subjects: try context.fetch(FetchDescriptor<Subject>()),
-            assignments: try context.fetch(FetchDescriptor<Assignment>()),
-            timeBlocks: try context.fetch(FetchDescriptor<TimeBlock>()),
-            submissionHistory: try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
+        let subjects = try context.fetch(FetchDescriptor<Subject>())
+        let assignments = try context.fetch(FetchDescriptor<Assignment>())
+        let timeBlocks = try context.fetch(FetchDescriptor<TimeBlock>())
+        let submissionHistory = try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
+        return try archive(
+            json: try encodedDocument(
+                subjects: subjects,
+                assignments: assignments,
+                timeBlocks: timeBlocks,
+                submissionHistory: submissionHistory
+            ),
+            assignments: assignments
         )
     }
 
@@ -112,13 +134,19 @@ enum DataExportService {
     @MainActor
     /// 校验 JSON 后恢复到当前数据库。
     static func restore(data: Data, into context: ModelContext) throws {
+        let documentData = BackupArchive.isArchive(data)
+            ? try BackupArchive.readEntry(named: "studyflow.json", from: data)
+            : data
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        let document = try decoder.decode(ExportDocument.self, from: data)
+        let document = try decoder.decode(ExportDocument.self, from: documentData)
         try validate(document)
 
         let previousAssignments = (try? context.fetch(FetchDescriptor<Assignment>())) ?? []
         previousAssignments.forEach { NotificationManager.shared.cancel(for: $0.id) }
+        ((try? context.fetch(FetchDescriptor<Subject>())) ?? []).forEach {
+            NotificationManager.shared.cancelSubjectReminder(for: $0.id)
+        }
 
         ((try? context.fetch(FetchDescriptor<TimeBlock>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach { context.delete($0) }
@@ -134,7 +162,9 @@ enum DataExportService {
                     colorHex: record.colorHex,
                     parentId: record.parentId,
                     sortOrder: record.sortOrder,
-                    createdAt: record.createdAt
+                    createdAt: record.createdAt,
+                    assignmentIntervalDays: record.assignmentIntervalDays,
+                    lastAssignmentRegisteredAt: record.lastAssignmentRegisteredAt
                 )
             )
         }
@@ -164,6 +194,18 @@ enum DataExportService {
                         title: $0.title,
                         isCompleted: $0.isCompleted,
                         sortOrder: $0.sortOrder,
+                        assignment: assignment
+                    )
+                }
+            assignment.attachments = (record.attachments ?? [])
+                .sorted { $0.createdAt < $1.createdAt }
+                .map {
+                    ImageAttachment(
+                        id: $0.id,
+                        fileName: $0.fileName,
+                        mimeType: $0.mimeType,
+                        imageData: $0.imageData,
+                        createdAt: $0.createdAt,
                         assignment: assignment
                     )
                 }
@@ -201,6 +243,10 @@ enum DataExportService {
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach {
             NotificationManager.shared.schedule(for: $0)
         }
+        NotificationManager.scheduleAllSubjectReminders(
+            subjects: (try? context.fetch(FetchDescriptor<Subject>())) ?? [],
+            assignments: (try? context.fetch(FetchDescriptor<Assignment>())) ?? []
+        )
     }
 
     /// 写入同步文件并保留指定修改时间。
@@ -247,7 +293,9 @@ enum DataExportService {
                         colorHex: $0.colorHex,
                         parentId: $0.parentId,
                         sortOrder: $0.sortOrder,
-                        createdAt: $0.createdAt
+                        createdAt: $0.createdAt,
+                        assignmentIntervalDays: $0.assignmentIntervalDays,
+                        lastAssignmentRegisteredAt: $0.lastAssignmentRegisteredAt
                     )
                 },
             assignments: assignments
@@ -276,6 +324,17 @@ enum DataExportService {
                                     title: $0.title,
                                     isCompleted: $0.isCompleted,
                                     sortOrder: $0.sortOrder
+                                )
+                            },
+                        attachments: $0.attachments
+                            .sorted { $0.createdAt < $1.createdAt }
+                            .map {
+                                AttachmentRecord(
+                                    id: $0.id,
+                                    fileName: $0.fileName,
+                                    mimeType: $0.mimeType,
+                                    imageData: $0.imageData,
+                                    createdAt: $0.createdAt
                                 )
                             }
                     )
@@ -334,6 +393,7 @@ enum DataExportService {
         }
 
         try requireUniqueIDs(document.assignments.flatMap(\.subtasks).map(\.id))
+        try requireUniqueIDs(document.assignments.compactMap(\.attachments).flatMap { $0 }.map(\.id))
 
         let assignmentIDs = Set(document.assignments.map(\.id))
         for assignment in document.assignments {
@@ -363,6 +423,28 @@ enum DataExportService {
         }
     }
 
+
+    private static func archive(json: Data, assignments: [Assignment]) throws -> Data {
+        var entries = [BackupArchive.Entry(path: "studyflow.json", data: json)]
+        entries += assignments
+            .sorted { $0.createdAt < $1.createdAt }
+            .flatMap { assignment in
+                assignment.attachments
+                    .sorted { $0.createdAt < $1.createdAt }
+                    .map { attachment in
+                        BackupArchive.Entry(
+                            path: BackupArchive.path(
+                                forAttachment: attachment.id,
+                                assignmentID: assignment.id,
+                                mimeType: attachment.mimeType
+                            ),
+                            data: attachment.imageData
+                        )
+                    }
+            }
+        return try BackupArchive.create(entries: entries)
+    }
+
     @MainActor
     private static func chooseDestination(for destination: Destination) -> URL? {
         let panel = NSSavePanel()
@@ -371,9 +453,9 @@ enum DataExportService {
             ? "确认文件名为 StudyFlow 备份，然后保存到 iCloud 云盘。"
             : "可选择本机文件夹或 iCloud 云盘作为备份位置。"
         panel.prompt = "导出"
-        panel.allowedContentTypes = [.json]
+        panel.allowedContentTypes = [.zip]
         panel.canCreateDirectories = true
-        panel.nameFieldStringValue = "StudyFlow-Backup-\(Self.dateStamp()).json"
+        panel.nameFieldStringValue = "StudyFlow-Backup-\(Self.dateStamp()).zip"
 
         if destination == .iCloudDrive {
             panel.directoryURL = FileManager.default.homeDirectoryForCurrentUser

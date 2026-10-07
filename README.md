@@ -5,16 +5,16 @@ StudyFlow 是一款面向学生与需要管理课程、作业、截止日期和�
 - **macOS** 使用 SwiftUI + SwiftData，采用侧边栏、列表与 Inspector 详情布局，并遵循 Apple Human Interface Guidelines；
 - **Android** 使用 Jetpack Compose + Room/SQLite，遵循 Material 3 Expressive，并针对手机、折叠屏和平板提供响应式布局。
 
-当前版本：**1.5.0**。macOS 与 Android 功能设计保持一致，但平台实现、界面组件和发布流程分别维护。
+当前版本：**1.6.0**。macOS 与 Android 功能设计保持一致，但平台实现、界面组件和发布流程分别维护。
 
 ---
 
 ## 下载最新版本
 
-当前版本：**1.5.0**
+当前版本：**1.6.0**
 
-- [macOS 1.5.0](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.5.0) — Apple Silicon（arm64），macOS 14+
-- [Android 1.5.0](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.5.0) — APK，Android 8.0+
+- [macOS 1.6.0](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.6.0) — Apple Silicon（arm64），macOS 14+
+- [Android 1.6.0](https://github.com/HyperPlusQ/StudyFlow/releases/tag/v1.6.0) — APK，Android 8.0+
 - 仓库内镜像：[StudyFlow-macOS.zip](Releases/StudyFlow-macOS.zip)
 
 macOS 包解压后直接运行 `StudyFlow.app`；Android 包可下载 APK 后安装。

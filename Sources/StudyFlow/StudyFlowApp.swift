@@ -22,6 +22,7 @@ struct StudyFlowApp: App {
             Subject.self,
             Assignment.self,
             Subtask.self,
+            ImageAttachment.self,
             TimeBlock.self,
             SubmissionHistoryEntry.self
         ])

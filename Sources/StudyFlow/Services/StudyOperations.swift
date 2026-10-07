@@ -22,6 +22,10 @@ enum StudyOperations {
 
     /// 删除科目并解除作业、时间块和历史记录关联。
     static func delete(_ subject: Subject, from subjects: [Subject], assignments: [Assignment], context: ModelContext) {
+        // 删除层级连同其全部后代，先移除这些科目的待发布置提醒。
+        for removable in [subject] + descendants(of: subject, in: subjects) {
+            NotificationManager.shared.cancelSubjectReminder(for: removable.id)
+        }
         for child in subjects where child.parentId == subject.id {
             child.parentId = subject.parentId
         }

@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import AppKit
 
 struct AssignmentDetailView: View {
     @Bindable var assignment: Assignment
@@ -37,6 +38,7 @@ struct AssignmentDetailView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                attachmentSection
                 checklist
                 timeBlocks
                 Divider()
@@ -130,6 +132,50 @@ struct AssignmentDetailView: View {
                 }
             }
             .padding(4)
+        }
+    }
+
+    /// 展示作业中的图片附件，保持清晰的内容优先布局。
+    private var attachmentSection: some View {
+        section("图片附件") {
+            if assignment.attachments.isEmpty {
+                Text("尚未添加图片附件。")
+                    .font(.callout)
+                    .foregroundStyle(.tertiary)
+            } else {
+                LazyVGrid(
+                    columns: Array(
+                        repeating: GridItem(.flexible(), spacing: 10),
+                        count: 4
+                    ),
+                    spacing: 10
+                ) {
+                    ForEach(assignment.attachments.sorted { $0.createdAt < $1.createdAt }, id: \.id) { attachment in
+                        if let image = NSImage(data: attachment.imageData) {
+                            Image(nsImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fill)
+                                .frame(height: 150)
+                                .frame(maxWidth: .infinity)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .overlay {
+                                    RoundedRectangle(cornerRadius: 12)
+                                        .strokeBorder(Color.primary.opacity(0.08))
+                                }
+                                .accessibilityLabel("附件：\(attachment.fileName)")
+                        } else {
+                            RoundedRectangle(cornerRadius: 12)
+                                .fill(Color.secondary.opacity(0.12))
+                                .frame(height: 150)
+                                .overlay {
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(.secondary)
+                                }
+                                .accessibilityLabel("无法预览附件：\(attachment.fileName)")
+                        }
+                    }
+                }
+            }
         }
     }
 

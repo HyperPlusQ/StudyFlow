@@ -1,0 +1,793 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f5f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+  <meta name="description" content="StudyFlow 是面向 Apple 与 Android 平台的学习和任务管理应用，提供作业规划、提醒、附件、时间块与跨平台备份。">
+  <title>StudyFlow · 让每项作业各得其所</title>
+  <link rel="canonical" href="https://hyperplusq.github.io/StudyFlow/">
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f5f5f7;
+      --surface: rgba(255, 255, 255, .74);
+      --surface-strong: #ffffff;
+      --text: #1d1d1f;
+      --secondary-text: #515154;
+      --tertiary-text: #6e6e73;
+      --separator: rgba(0, 0, 0, .10);
+      --accent: #0071e3;
+      --accent-hover: #0077ed;
+      --accent-soft: rgba(0, 113, 227, .10);
+      --shadow: 0 18px 60px rgba(0, 0, 0, .10);
+      --radius-large: 30px;
+      --radius-medium: 22px;
+      --content: 1120px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #000000;
+        --surface: rgba(28, 28, 30, .76);
+        --surface-strong: #1c1c1e;
+        --text: #f5f5f7;
+        --secondary-text: #a1a1a6;
+        --tertiary-text: #8e8e93;
+        --separator: rgba(255, 255, 255, .14);
+        --accent: #0a84ff;
+        --accent-hover: #2691ff;
+        --accent-soft: rgba(10, 132, 255, .16);
+        --shadow: 0 24px 80px rgba(0, 0, 0, .48);
+      }
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      background: var(--background);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 4%, rgba(0, 113, 227, .14), transparent 30rem),
+        radial-gradient(circle at 82% 16%, rgba(147, 51, 234, .11), transparent 28rem),
+        var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+        "Helvetica Neue", "PingFang SC", "Microsoft YaHei", sans-serif;
+      font-size: 17px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(calc(100% - 40px), var(--content));
+      margin-inline: auto;
+    }
+
+    .nav {
+      position: sticky;
+      top: 14px;
+      z-index: 10;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-top: 14px;
+      padding: 11px 12px 11px 18px;
+      border: 1px solid var(--separator);
+      border-radius: 999px;
+      background: var(--surface);
+      box-shadow: 0 10px 35px rgba(0, 0, 0, .08);
+      backdrop-filter: saturate(180%) blur(24px);
+      -webkit-backdrop-filter: saturate(180%) blur(24px);
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 650;
+      letter-spacing: -.01em;
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      display: grid;
+      width: 30px;
+      height: 30px;
+      place-items: center;
+      border-radius: 9px;
+      background: linear-gradient(145deg, #45a8ff, #0066d6);
+      color: white;
+      box-shadow: 0 6px 18px rgba(0, 113, 227, .28);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .nav-link {
+      padding: 9px 14px;
+      border-radius: 999px;
+      color: var(--secondary-text);
+      font-size: 14px;
+      font-weight: 550;
+      text-decoration: none;
+      transition: background .2s ease, color .2s ease;
+    }
+
+    .nav-link:hover {
+      background: var(--accent-soft);
+      color: var(--accent);
+    }
+
+    .nav-github {
+      color: white;
+      background: var(--accent);
+      box-shadow: 0 8px 24px rgba(0, 113, 227, .24);
+    }
+
+    .nav-github:hover {
+      color: white;
+      background: var(--accent-hover);
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(320px, .95fr);
+      align-items: center;
+      gap: clamp(34px, 7vw, 92px);
+      min-height: 690px;
+      padding: 94px 0 76px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 18px;
+      padding: 7px 12px;
+      border: 1px solid rgba(0, 113, 227, .18);
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 650;
+      letter-spacing: .02em;
+    }
+
+    h1, h2, h3, p { margin-top: 0; }
+
+    h1 {
+      max-width: 760px;
+      margin-bottom: 22px;
+      font-size: clamp(46px, 7vw, 78px);
+      line-height: 1.04;
+      letter-spacing: -.055em;
+      font-weight: 750;
+    }
+
+    .gradient-text {
+      background: linear-gradient(92deg, #0071e3, #5856d6 54%, #af52de);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+    }
+
+    .lede {
+      max-width: 650px;
+      margin-bottom: 32px;
+      color: var(--secondary-text);
+      font-size: clamp(18px, 2vw, 22px);
+      line-height: 1.55;
+      letter-spacing: -.015em;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .button {
+      display: inline-flex;
+      min-height: 50px;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      padding: 12px 22px;
+      border: 1px solid transparent;
+      border-radius: 999px;
+      font-size: 16px;
+      font-weight: 650;
+      text-decoration: none;
+      transition: transform .2s ease, background .2s ease, box-shadow .2s ease;
+    }
+
+    .button:hover { transform: translateY(-2px); }
+
+    .button-primary {
+      color: white;
+      background: var(--accent);
+      box-shadow: 0 12px 30px rgba(0, 113, 227, .25);
+    }
+
+    .button-primary:hover {
+      color: white;
+      background: var(--accent-hover);
+      box-shadow: 0 16px 36px rgba(0, 113, 227, .32);
+    }
+
+    .button-secondary {
+      border-color: var(--separator);
+      background: var(--surface);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .button-secondary:hover { background: var(--surface-strong); }
+
+    .visual {
+      position: relative;
+      min-height: 500px;
+      perspective: 1100px;
+    }
+
+    .app-window {
+      position: absolute;
+      inset: 46px 0 auto;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, .44);
+      border-radius: 30px;
+      background: rgba(255, 255, 255, .82);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(30px) saturate(170%);
+      -webkit-backdrop-filter: blur(30px) saturate(170%);
+      transform: rotateY(-7deg) rotateX(3deg);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .app-window { background: rgba(28, 28, 30, .84); }
+    }
+
+    .window-bar {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      height: 46px;
+      padding: 0 16px;
+      border-bottom: 1px solid var(--separator);
+    }
+
+    .window-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #ff5f57;
+    }
+
+    .window-dot:nth-child(2) { background: #febc2e; }
+    .window-dot:nth-child(3) { background: #28c840; }
+
+    .app-body {
+      display: grid;
+      grid-template-columns: 82px 1fr;
+      min-height: 360px;
+    }
+
+    .sidebar {
+      padding: 18px 13px;
+      border-right: 1px solid var(--separator);
+      background: rgba(0, 0, 0, .035);
+    }
+
+    .side-item {
+      height: 37px;
+      margin-bottom: 8px;
+      border-radius: 12px;
+      background: rgba(0, 113, 227, .16);
+    }
+
+    .side-item:nth-child(2),
+    .side-item:nth-child(3) { background: rgba(128, 128, 128, .13); }
+
+    .content-pane { padding: 24px; }
+
+    .pane-title {
+      width: 42%;
+      height: 17px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+      background: rgba(128, 128, 128, .36);
+    }
+
+    .task-card {
+      margin-bottom: 12px;
+      padding: 15px;
+      border: 1px solid var(--separator);
+      border-radius: 17px;
+      background: rgba(255, 255, 255, .62);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .task-card { background: rgba(44, 44, 46, .70); }
+    }
+
+    .task-line {
+      width: 72%;
+      height: 10px;
+      margin-bottom: 9px;
+      border-radius: 6px;
+      background: rgba(128, 128, 128, .40);
+    }
+
+    .task-meta {
+      display: flex;
+      gap: 7px;
+    }
+
+    .pill {
+      width: 58px;
+      height: 19px;
+      border-radius: 999px;
+      background: rgba(0, 113, 227, .17);
+    }
+
+    .pill.purple { background: rgba(147, 51, 234, .18); }
+
+    .float-card {
+      position: absolute;
+      right: -8px;
+      bottom: 34px;
+      width: min(260px, 70%);
+      padding: 18px;
+      border: 1px solid var(--separator);
+      border-radius: 24px;
+      background: var(--surface-strong);
+      box-shadow: 0 20px 55px rgba(0, 0, 0, .18);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    .float-title {
+      margin-bottom: 6px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .float-copy {
+      margin-bottom: 14px;
+      color: var(--tertiary-text);
+      font-size: 13px;
+    }
+
+    .progress {
+      height: 8px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: rgba(128, 128, 128, .18);
+    }
+
+    .progress::after {
+      display: block;
+      width: 76%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #5856d6);
+      content: "";
+    }
+
+    .section {
+      padding: 94px 0;
+      border-top: 1px solid var(--separator);
+    }
+
+    .section-heading {
+      max-width: 720px;
+      margin-bottom: 38px;
+    }
+
+    .kicker {
+      margin-bottom: 10px;
+      color: var(--accent);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+    }
+
+    h2 {
+      margin-bottom: 14px;
+      font-size: clamp(34px, 5vw, 54px);
+      line-height: 1.08;
+      letter-spacing: -.04em;
+    }
+
+    .section-heading p {
+      margin-bottom: 0;
+      color: var(--secondary-text);
+      font-size: 19px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .card {
+      min-height: 230px;
+      padding: 26px;
+      border: 1px solid var(--separator);
+      border-radius: var(--radius-large);
+      background: var(--surface);
+      box-shadow: 0 12px 45px rgba(0, 0, 0, .055);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      transition: transform .25s ease, box-shadow .25s ease;
+    }
+
+    .card:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, .10);
+    }
+
+    .icon {
+      display: grid;
+      width: 46px;
+      height: 46px;
+      margin-bottom: 24px;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 23px;
+    }
+
+    .card h3 {
+      margin-bottom: 9px;
+      font-size: 21px;
+      letter-spacing: -.02em;
+    }
+
+    .card p {
+      margin-bottom: 0;
+      color: var(--secondary-text);
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    .platforms {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 18px;
+    }
+
+    .platform {
+      position: relative;
+      overflow: hidden;
+      padding: 30px;
+      border: 1px solid var(--separator);
+      border-radius: var(--radius-large);
+      background: var(--surface-strong);
+      text-decoration: none;
+      transition: transform .25s ease, border-color .25s ease;
+    }
+
+    .platform::after {
+      position: absolute;
+      right: -40px;
+      bottom: -55px;
+      width: 145px;
+      height: 145px;
+      border-radius: 50%;
+      background: var(--accent-soft);
+      content: "";
+    }
+
+    .platform:hover {
+      border-color: rgba(0, 113, 227, .45);
+      transform: translateY(-4px);
+    }
+
+    .platform-name {
+      margin-bottom: 8px;
+      font-size: 23px;
+      font-weight: 730;
+      letter-spacing: -.025em;
+    }
+
+    .platform-meta {
+      color: var(--secondary-text);
+      font-size: 15px;
+    }
+
+    .platform-arrow {
+      position: relative;
+      z-index: 1;
+      display: inline-flex;
+      margin-top: 34px;
+      color: var(--accent);
+      font-weight: 650;
+    }
+
+    .github-banner {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 34px;
+      padding: clamp(30px, 6vw, 60px);
+      border: 1px solid rgba(0, 113, 227, .24);
+      border-radius: 36px;
+      background:
+        linear-gradient(135deg, rgba(0, 113, 227, .12), rgba(88, 86, 214, .09)),
+        var(--surface);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+    }
+
+    .github-banner h2 { max-width: 700px; margin-bottom: 12px; }
+
+    .github-banner p {
+      max-width: 680px;
+      margin-bottom: 0;
+      color: var(--secondary-text);
+      font-size: 18px;
+    }
+
+    footer {
+      padding: 38px 0 54px;
+      color: var(--tertiary-text);
+      font-size: 14px;
+    }
+
+    .footer-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 18px;
+    }
+
+    .footer-links a { text-decoration: none; }
+    .footer-links a:hover { color: var(--accent); }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+    }
+
+    @media (max-width: 900px) {
+      .hero {
+        grid-template-columns: 1fr;
+        min-height: auto;
+        padding-top: 76px;
+      }
+
+      .visual { min-height: 470px; }
+      .grid, .platforms { grid-template-columns: 1fr 1fr; }
+      .github-banner { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(calc(100% - 24px), var(--content)); }
+      .nav { top: 8px; margin-top: 8px; padding-left: 13px; }
+      .nav-link:not(.nav-github) { display: none; }
+      .hero { padding-top: 58px; gap: 34px; }
+      h1 { font-size: clamp(42px, 14vw, 62px); }
+      .grid, .platforms { grid-template-columns: 1fr; }
+      .app-window { inset-inline: 0; transform: none; }
+      .visual { min-height: 455px; }
+      .float-card { right: 6px; }
+      .section { padding: 70px 0; }
+      .footer-row { align-items: flex-start; flex-direction: column; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+        animation-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="shell">
+    <nav class="nav" aria-label="主导航">
+      <a class="brand" href="#top" aria-label="StudyFlow 首页">
+        <span class="brand-mark" aria-hidden="true">✓</span>
+        <span>StudyFlow</span>
+      </a>
+      <div class="nav-links">
+        <a class="nav-link" href="#features">功能</a>
+        <a class="nav-link" href="#platforms">平台</a>
+        <a class="nav-link nav-github" href="https://github.com/HyperPlusQ/StudyFlow" target="_blank" rel="noopener noreferrer">
+          GitHub 仓库
+        </a>
+      </div>
+    </nav>
+  </header>
+
+  <main id="top">
+    <section class="hero shell" aria-labelledby="hero-title">
+      <div>
+        <span class="eyebrow"><span aria-hidden="true">●</span> 为专注而生的学习任务中心</span>
+        <h1 id="hero-title">让每项作业<br><span class="gradient-text">各得其所。</span></h1>
+        <p class="lede">
+          StudyFlow 将作业、科目、截止提醒、时间块与图片附件汇聚在一个安静、清晰的工作空间，
+          并在 macOS、iOS 与 Android 之间保持一致体验。
+        </p>
+        <div class="actions">
+          <a class="button button-primary" href="https://github.com/HyperPlusQ/StudyFlow" target="_blank" rel="noopener noreferrer">
+            <span aria-hidden="true">↗</span> 前往 GitHub 官方仓库
+          </a>
+          <a class="button button-secondary" href="https://github.com/HyperPlusQ/StudyFlow/releases/latest" target="_blank" rel="noopener noreferrer">
+            获取最新版本
+          </a>
+        </div>
+      </div>
+
+      <div class="visual" aria-hidden="true">
+        <div class="app-window">
+          <div class="window-bar">
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+          </div>
+          <div class="app-body">
+            <aside class="sidebar">
+              <div class="side-item"></div>
+              <div class="side-item"></div>
+              <div class="side-item"></div>
+            </aside>
+            <div class="content-pane">
+              <div class="pane-title"></div>
+              <div class="task-card">
+                <div class="task-line"></div>
+                <div class="task-meta"><span class="pill"></span><span class="pill purple"></span></div>
+              </div>
+              <div class="task-card">
+                <div class="task-line" style="width: 84%"></div>
+                <div class="task-meta"><span class="pill"></span></div>
+              </div>
+              <div class="task-card">
+                <div class="task-line" style="width: 65%"></div>
+                <div class="task-meta"><span class="pill purple"></span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="float-card">
+          <div class="float-title">本周完成度</div>
+          <div class="float-copy">保持节奏，比赶完所有事更重要。</div>
+          <div class="progress"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features" aria-labelledby="features-title">
+      <div class="shell">
+        <div class="section-heading">
+          <div class="kicker">Core Experience</div>
+          <h2 id="features-title">复杂的学习安排，<br>保持简单。</h2>
+          <p>从记录到完成，每一步都围绕清晰的优先级、可靠的提醒和可追踪的进度展开。</p>
+        </div>
+
+        <div class="grid">
+          <article class="card">
+            <div class="icon" aria-hidden="true">✓</div>
+            <h3>作业与子任务</h3>
+            <p>用清单拆解大型作业，记录截止日期、提交方式与优先级，完成状态自动流转。</p>
+          </article>
+          <article class="card">
+            <div class="icon" aria-hidden="true">◷</div>
+            <h3>提醒与时间块</h3>
+            <p>临近截止及时通知，并按科目设置作业布置间隔；把待办转换为可执行的日程。</p>
+          </article>
+          <article class="card">
+            <div class="icon" aria-hidden="true">▧</div>
+            <h3>图片附件</h3>
+            <p>为每项作业保存题面、草稿或参考图片，列表与详情页均可快速预览。</p>
+          </article>
+          <article class="card">
+            <div class="icon" aria-hidden="true">⌕</div>
+            <h3>搜索与智能排序</h3>
+            <p>按科目、截止日期和状态组合筛选，以时间紧迫性与权重排出真正重要的任务。</p>
+          </article>
+          <article class="card">
+            <div class="icon" aria-hidden="true">⇅</div>
+            <h3>ZIP 备份与同步</h3>
+            <p>JSON 与附件封装为 ZIP，兼容旧版备份，并可跨设备恢复完整学习数据。</p>
+          </article>
+          <article class="card">
+            <div class="icon" aria-hidden="true">▦</div>
+            <h3>桌面与移动小组件</h3>
+            <p>在桌面和主屏直接查看近期作业，让下一步行动始终触手可及。</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="platforms" aria-labelledby="platforms-title">
+      <div class="shell">
+        <div class="section-heading">
+          <div class="kicker">Available Platforms</div>
+          <h2 id="platforms-title">熟悉的设备，<br>原生的体验。</h2>
+          <p>三个平台独立演进，使用各自的设计语言，共享一致的学习工作流。</p>
+        </div>
+
+        <div class="platforms">
+          <a class="platform" href="https://github.com/HyperPlusQ/StudyFlow/tree/macos" target="_blank" rel="noopener noreferrer">
+            <div class="platform-name">macOS</div>
+            <div class="platform-meta">SwiftUI · Liquid Glass · iCloud</div>
+            <span class="platform-arrow">查看源码 →</span>
+          </a>
+          <a class="platform" href="https://github.com/HyperPlusQ/StudyFlow/tree/ios" target="_blank" rel="noopener noreferrer">
+            <div class="platform-name">iOS 与 iPadOS</div>
+            <div class="platform-meta">原生控件 · 弹性布局 · 小组件</div>
+            <span class="platform-arrow">查看源码 →</span>
+          </a>
+          <a class="platform" href="https://github.com/HyperPlusQ/StudyFlow/tree/android" target="_blank" rel="noopener noreferrer">
+            <div class="platform-name">Android</div>
+            <div class="platform-meta">Material 3 Expressive · 悬浮导航</div>
+            <span class="platform-arrow">查看源码 →</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="github-title">
+      <div class="shell">
+        <div class="github-banner">
+          <div>
+            <div class="kicker">Open Source Gateway</div>
+            <h2 id="github-title">从官方 GitHub 仓库开始。</h2>
+            <p>获取源码、阅读更新说明、下载最新发行包，并向项目提交建议或问题。</p>
+          </div>
+          <a class="button button-primary" href="https://github.com/HyperPlusQ/StudyFlow" target="_blank" rel="noopener noreferrer">
+            打开 GitHub 仓库 <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="shell">
+    <div class="footer-row">
+      <span>© 2026 StudyFlow · Designed for focused learning.</span>
+      <div class="footer-links">
+        <a href="https://github.com/HyperPlusQ/StudyFlow" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <a href="https://github.com/HyperPlusQ/StudyFlow/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a href="https://github.com/HyperPlusQ/StudyFlow/issues" target="_blank" rel="noopener noreferrer">反馈</a>
+      </div>
+    </div>
+    <span class="sr-only">StudyFlow 官方项目入口。</span>
+  </footer>
+</body>
+</html>
