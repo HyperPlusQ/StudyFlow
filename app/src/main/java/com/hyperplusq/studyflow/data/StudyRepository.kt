@@ -1,8 +1,10 @@
 package com.hyperplusq.studyflow.data
 
+import androidx.room.withTransaction
 import com.hyperplusq.studyflow.data.db.AppDatabase
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
+import com.hyperplusq.studyflow.data.db.AttachmentEntity
 import com.hyperplusq.studyflow.data.db.SubmissionHistoryEntity
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 import com.hyperplusq.studyflow.data.db.SubtaskEntity
@@ -22,18 +24,64 @@ class StudyRepository(private val db: AppDatabase) {
     suspend fun subject(id: Long): SubjectEntity? = db.subjectDao().findById(id)
     suspend fun assignment(id: Long) = db.assignmentDao().findById(id)
 
-    /** 新增或更新科目并返回其主键。 */
-    suspend fun saveSubject(subject: SubjectEntity): Long =
-        if (subject.id == 0L) db.subjectDao().insert(subject)
-        else db.subjectDao().update(subject).let { subject.id }
+    /** 新增或更新科目；编辑时保留最近一次作业登记时间。 */
+    suspend fun saveSubject(subject: SubjectEntity): Long = db.withTransaction {
+        if (subject.id == 0L) {
+            db.subjectDao().insert(subject)
+        } else {
+            val previous = db.subjectDao().findById(subject.id)
+            db.subjectDao().update(
+                subject.copy(lastAssignmentRegisteredAt = subject.lastAssignmentRegisteredAt
+                    ?: previous?.lastAssignmentRegisteredAt)
+            )
+            subject.id
+        }
+    }
 
+    /** 删除科目并取消关联数据。 */
     suspend fun deleteSubject(subject: SubjectEntity) = db.subjectDao().deleteTree(subject)
 
-    /** 新增或更新作业并返回其主键。 */
-    suspend fun saveAssignment(assignment: AssignmentEntity): Long =
-        if (assignment.id == 0L) db.assignmentDao().insert(assignment)
-        else db.assignmentDao().update(assignment).let { assignment.id }
+    /**
+     * 在同一事务中保存作业、附件和科目登记时间，避免界面或小组件读取到中间状态。
+     * 附件传入 null 时不会修改现有附件；传入列表时（包括空列表）会整体替换。
+     */
+    suspend fun saveAssignment(
+        assignment: AssignmentEntity,
+        attachments: List<AttachmentEntity>? = null
+    ): Long = db.withTransaction {
+        val previous = if (assignment.id == 0L) null else db.assignmentDao().findById(assignment.id)
+        val savedId = if (assignment.id == 0L) {
+            db.assignmentDao().insert(assignment)
+        } else {
+            db.assignmentDao().update(assignment)
+            assignment.id
+        }
 
+        if (attachments != null) {
+            db.attachmentDao().deleteForAssignment(savedId)
+            if (attachments.isNotEmpty()) {
+                db.attachmentDao().insertAll(
+                    attachments.map { it.copy(id = 0, assignmentId = savedId) }
+                )
+            }
+        }
+
+        // 新作业（含从其他科目移动过来的作业）刷新目标科目的登记时间。
+        assignment.subjectId?.let { subjectId ->
+            val shouldMarkNewRegistration = assignment.id == 0L ||
+                previous?.assignment?.subjectId != assignment.subjectId
+            if (shouldMarkNewRegistration) {
+                db.subjectDao().findById(subjectId)?.let { subject ->
+                    db.subjectDao().update(
+                        subject.copy(lastAssignmentRegisteredAt = System.currentTimeMillis())
+                    )
+                }
+            }
+        }
+        savedId
+    }
+
+    /** 删除作业时由外键级联清理附件。 */
     suspend fun deleteAssignment(id: Long) = db.assignmentDao().delete(id)
 
     /** 更新作业完成状态和完成时间。 */
@@ -75,7 +123,7 @@ class StudyRepository(private val db: AppDatabase) {
     suspend fun deleteSubmissionHistory(id: Long) =
         db.submissionHistoryDao().delete(id)
 
-    /** 一次性读取全部作业，供导出和小组件使用。 */
+    /** 一次性读取全部数据，供导出、提醒和小组件使用。 */
     suspend fun allAssignmentsOnce(): List<AssignmentEntity> = db.assignmentDao().allOnce()
     suspend fun subjectsOnce(): List<SubjectEntity> = db.subjectDao().allOnce()
     suspend fun assignmentsOnce(): List<com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks> =
@@ -83,4 +131,6 @@ class StudyRepository(private val db: AppDatabase) {
     suspend fun timeBlocksOnce(): List<TimeBlockEntity> = db.timeBlockDao().allOnce()
     suspend fun submissionHistoryOnce(): List<SubmissionHistoryEntity> =
         db.submissionHistoryDao().allOnce()
+    suspend fun attachmentsFor(assignmentId: Long): List<AttachmentEntity> =
+        db.attachmentDao().forAssignment(assignmentId)
 }

@@ -1,7 +1,10 @@
 package com.hyperplusq.studyflow.ui
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -27,15 +31,20 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
 import com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks
+import com.hyperplusq.studyflow.data.db.AttachmentEntity
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 import com.hyperplusq.studyflow.domain.DateUtils
 import com.hyperplusq.studyflow.domain.SmartScoring
@@ -131,6 +140,14 @@ fun AssignmentCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+                if (item.attachments.isNotEmpty()) {
+                    Spacer(Modifier.height(9.dp))
+                    AttachmentStrip(
+                        attachments = item.attachments,
+                        maxVisible = 3,
+                        modifier = Modifier.align(Alignment.Start)
+                    )
+                }
                 Spacer(Modifier.height(8.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
@@ -205,6 +222,86 @@ fun StatCard(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+    }
+}
+
+
+/**
+ * 在作业列表中紧凑展示图片附件，最多显示三张；超出部分以 +N 标记。
+ */
+@Composable
+fun AttachmentStrip(
+    attachments: List<AttachmentEntity>,
+    maxVisible: Int,
+    modifier: Modifier = Modifier,
+    tileSize: androidx.compose.ui.unit.Dp = 44.dp
+) {
+    if (attachments.isEmpty()) return
+    val visible = attachments.take(maxVisible)
+    val hidden = attachments.size - visible.size
+    Row(
+        modifier = modifier.horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        visible.forEachIndexed { index, attachment ->
+            Box(
+                Modifier
+                    .size(tileSize)
+                    .clip(RoundedCornerShape(if (tileSize > 60.dp) 18.dp else 12.dp))
+            ) {
+                AttachmentPreview(
+                    attachment = attachment,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                if (index == visible.lastIndex && hidden > 0) {
+                    Box(
+                        Modifier
+                            .matchParentSize()
+                            .background(Color.Black.copy(alpha = 0.56f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "+$hidden",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelLarge
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * 解码并裁切显示附件图片；调用方通过尺寸控制缩略图或详情画廊的大小。
+ */
+@Composable
+fun AttachmentPreview(
+    attachment: AttachmentEntity,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(attachment.id, attachment.imageData.contentHashCode()) {
+        BitmapFactory.decodeByteArray(
+            attachment.imageData,
+            0,
+            attachment.imageData.size
+        )?.asImageBitmap()
+    }
+    if (bitmap != null) {
+        Image(
+            bitmap = bitmap,
+            contentDescription = attachment.fileName,
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest),
+            contentAlignment = Alignment.Center
+        ) {
+            Text("图片", style = MaterialTheme.typography.labelSmall)
         }
     }
 }

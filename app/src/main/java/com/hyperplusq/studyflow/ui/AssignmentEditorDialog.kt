@@ -1,23 +1,37 @@
 package com.hyperplusq.studyflow.ui
 
 import android.app.DatePickerDialog
+import android.graphics.BitmapFactory
+import android.provider.OpenableColumns
 import android.app.TimePickerDialog
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -29,25 +43,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks
+import com.hyperplusq.studyflow.data.db.AttachmentEntity
 import com.hyperplusq.studyflow.data.db.Priority
 import com.hyperplusq.studyflow.domain.DateUtils
 import com.hyperplusq.studyflow.system.SubmissionKind
 import com.hyperplusq.studyflow.system.SubmissionLink
 import java.util.Calendar
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AssignmentEditorDialog(
     initial: AssignmentWithSubtasks?,
     state: AppUiState,
     onDismiss: () -> Unit,
-    onSave: (AssignmentEntity) -> Unit
+    onSave: (AssignmentEntity, List<AttachmentEntity>) -> Unit
 ) {
     val current = initial?.assignment
     var title by remember { mutableStateOf(current?.title ?: "") }
@@ -58,10 +80,25 @@ fun AssignmentEditorDialog(
     var priority by remember { mutableStateOf(Priority.fromRaw(current?.priority ?: Priority.MEDIUM.rawValue)) }
     var weight by remember { mutableStateOf((current?.weight ?: 3).toFloat()) }
     var reminderHours by remember { mutableStateOf(current?.reminderLeadHours ?: 24) }
+    var attachments by remember { mutableStateOf(initial?.attachments ?: emptyList()) }
     var subjectMenu by remember { mutableStateOf(false) }
     var priorityMenu by remember { mutableStateOf(false) }
     var reminderMenu by remember { mutableStateOf(false) }
     val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    val attachmentPicker = rememberLauncherForActivityResult(
+        ActivityResultContracts.PickMultipleVisualMedia(10)
+    ) { uris ->
+        if (uris.isEmpty()) return@rememberLauncherForActivityResult
+        coroutineScope.launch {
+            val selected = uris.mapNotNull { uri ->
+                withContext(Dispatchers.IO) { readImageAttachment(context, uri) }
+            }
+            attachments = (attachments + selected).distinctBy {
+                Triple(it.fileName, it.createdAt, it.imageData.contentHashCode())
+            }.take(20)
+        }
+    }
     val suggestions = state.submissionHistory
         .filter { subjectId == null || it.subjectId == subjectId }
         .map { it.method }
@@ -102,6 +139,46 @@ fun AssignmentEditorDialog(
                         minLines = 3,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Text("图片附件", style = MaterialTheme.typography.labelLarge)
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Surface(
+                            onClick = {
+                                attachmentPicker.launch(
+                                    PickVisualMediaRequest(
+                                        ActivityResultContracts.PickVisualMedia.ImageOnly
+                                    )
+                                )
+                            },
+                            shape = MaterialTheme.shapes.large,
+                            color = MaterialTheme.colorScheme.surfaceContainerHighest,
+                            modifier = Modifier.size(84.dp)
+                        ) {
+                            androidx.compose.foundation.layout.Box(
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    Icons.Outlined.AddPhotoAlternate,
+                                    contentDescription = "添加图片附件"
+                                )
+                            }
+                        }
+                        attachments.forEachIndexed { index, attachment ->
+                            AttachmentThumbnail(
+                                attachment = attachment,
+                                onDelete = {
+                                    attachments = attachments.filterIndexed { i, _ -> i != index }
+                                },
+                                modifier = Modifier.size(84.dp)
+                            )
+                        }
+                    }
 
                     Text("科目", style = MaterialTheme.typography.labelLarge)
                     DropdownButton(
@@ -251,7 +328,8 @@ fun AssignmentEditorDialog(
                             priority = priority.rawValue,
                             weight = weight.toInt(),
                             reminderLeadHours = reminderHours
-                        )
+                        ),
+                        attachments
                     )
                 }
             ) { Text("保存") }
@@ -287,3 +365,78 @@ private fun reminderLabel(hours: Int): String = when (hours) {
     else -> "提前 $hours 小时"
 }
 
+
+
+@Composable
+private fun AttachmentThumbnail(
+    attachment: AttachmentEntity,
+    onDelete: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(attachment.imageData) {
+        BitmapFactory.decodeByteArray(
+            attachment.imageData,
+            0,
+            attachment.imageData.size
+        )?.asImageBitmap()
+    }
+    Box(modifier.clip(MaterialTheme.shapes.large)) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap,
+                contentDescription = attachment.fileName,
+                modifier = Modifier.fillMaxWidth().height(84.dp),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+        } else {
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(84.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("图片", style = MaterialTheme.typography.labelSmall)
+            }
+        }
+        IconButton(
+            onClick = onDelete,
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .size(28.dp)
+        ) {
+            Icon(
+                Icons.Outlined.Close,
+                contentDescription = "删除附件",
+                modifier = Modifier.size(16.dp),
+                tint = MaterialTheme.colorScheme.onPrimary
+            )
+        }
+    }
+}
+
+private suspend fun readImageAttachment(
+    context: android.content.Context,
+    uri: android.net.Uri
+): AttachmentEntity? {
+    val resolver = context.contentResolver
+    val mime = resolver.getType(uri)?.takeIf { it.startsWith("image/") }
+        ?: return null
+    val name = resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            val index = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (cursor.moveToFirst() && index >= 0) cursor.getString(index) else null
+        }
+        ?: uri.lastPathSegment
+        ?: "附件"
+    val bytes = resolver.openInputStream(uri)?.use { it.readBytes() } ?: return null
+    if (bytes.isEmpty()) return null
+    return AttachmentEntity(
+        id = 0,
+        assignmentId = 0,
+        fileName = name,
+        mimeType = mime,
+        imageData = bytes,
+        createdAt = System.currentTimeMillis()
+    )
+}

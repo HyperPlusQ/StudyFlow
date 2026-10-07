@@ -4,6 +4,7 @@ import android.app.Application
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import com.hyperplusq.studyflow.data.SettingsRepository
 import com.hyperplusq.studyflow.data.StudyRepository
@@ -29,10 +30,28 @@ class StudyFlowApp : Application() {
         WidgetUpdater.requestUpdate(this)
     }
 
+    /** 应用启动时统一恢复截止提醒和科目的作业布置提醒。 */
     private fun scheduleExistingReminders() {
         applicationScope.launch {
             try {
-                repository.allAssignmentsOnce().forEach { ReminderScheduler.schedule(this@StudyFlowApp, it) }
+                val enabled = settings.settings.first().notificationsEnabled
+                val assignments = repository.allAssignmentsOnce()
+                val subjects = repository.subjectsOnce()
+                val latestBySubject = assignments.groupBy { it.subjectId }
+                    .mapValues { (_, items) -> items.maxOf { it.createdAt } }
+                if (enabled) {
+                    assignments.forEach { ReminderScheduler.schedule(this@StudyFlowApp, it) }
+                    subjects.forEach {
+                        ReminderScheduler.scheduleSubject(
+                            this@StudyFlowApp,
+                            it,
+                            latestBySubject[it.id]
+                        )
+                    }
+                } else {
+                    assignments.forEach { ReminderScheduler.cancel(this@StudyFlowApp, it.id) }
+                    subjects.forEach { ReminderScheduler.cancelSubject(this@StudyFlowApp, it.id) }
+                }
             } catch (_: Exception) {
             }
         }

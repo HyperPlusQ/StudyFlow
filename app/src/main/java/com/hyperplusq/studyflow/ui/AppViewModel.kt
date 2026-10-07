@@ -13,6 +13,7 @@ import com.hyperplusq.studyflow.data.StudyRepository
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
 import com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks
+import com.hyperplusq.studyflow.data.db.AttachmentEntity
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 import com.hyperplusq.studyflow.data.db.SubtaskEntity
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
@@ -79,22 +80,57 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     /** 保存新建或修改后的科目。 */
     fun saveSubject(subject: SubjectEntity) = launchOp("已保存科目") {
         repository.saveSubject(subject)
+        // 重新读取数据库，保留仓储层自动补全的登记时间后再刷新提醒。
+        refreshSubjectReminders(settingsRepository.settings.first().notificationsEnabled)
+    }
+
+    /**
+     * 从数据库读取最新科目与作业，统一恢复或取消“作业布置间隔”提醒。
+     * 导入的旧数据可能缺少登记时间，因此用该科目最新作业的创建时间兜底。
+     */
+    private suspend fun refreshSubjectReminders(enabled: Boolean) {
+        val assignments = repository.allAssignmentsOnce()
+        val subjects = repository.subjectsOnce()
+        val latestBySubject = assignments
+            .groupBy { it.subjectId }
+            .mapValues { (_, items) -> items.maxOf { it.createdAt } }
+
+        if (enabled) {
+            subjects.forEach { subject ->
+                ReminderScheduler.scheduleSubject(
+                    getApplication(),
+                    subject,
+                    latestBySubject[subject.id]
+                )
+            }
+        } else {
+            subjects.forEach { ReminderScheduler.cancelSubject(getApplication(), it.id) }
+        }
     }
 
     /** 删除科目并保留关联作业。 */
     fun deleteSubject(subject: SubjectEntity) = launchOp("已删除科目") {
+        ReminderScheduler.cancelSubject(getApplication(), subject.id)
         repository.deleteSubject(subject)
     }
 
     /** 保存作业，并同步提醒、提交历史与日历。 */
     fun saveAssignment(
         assignment: AssignmentEntity,
+        attachments: List<AttachmentEntity>? = null,
         syncCalendar: Boolean = uiState.value.settings.alwaysSyncCalendar
     ) = launchOp("作业已保存") {
-        val id = repository.saveAssignment(assignment.copy(id = assignment.id, updatedAt = System.currentTimeMillis()))
+        val id = repository.saveAssignment(
+            assignment.copy(id = assignment.id, updatedAt = System.currentTimeMillis()),
+            attachments = attachments
+        )
         val saved = repository.assignment(id)?.assignment ?: return@launchOp
         repository.rememberSubmission(saved.subjectId, saved.submissionMethod)
-        ReminderScheduler.schedule(getApplication(), saved)
+        val notificationsEnabled = settingsRepository.settings.first().notificationsEnabled
+        if (notificationsEnabled) {
+            ReminderScheduler.schedule(getApplication(), saved)
+        }
+        refreshSubjectReminders(notificationsEnabled)
         syncCalendarIfPossible(saved, syncCalendar)
     }
 
@@ -154,15 +190,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setNotificationsEnabled(enabled: Boolean) = launchOp(null) {
         settingsRepository.setNotificationsEnabled(enabled)
+        val assignments = repository.allAssignmentsOnce()
         if (enabled) {
-            uiState.value.assignments.forEach {
-                if (it.assignment.status != AssignmentStatus.COMPLETED.rawValue) {
-                    ReminderScheduler.schedule(getApplication(), it.assignment)
+            assignments.forEach {
+                if (it.status != AssignmentStatus.COMPLETED.rawValue) {
+                    ReminderScheduler.schedule(getApplication(), it)
                 }
             }
         } else {
-            uiState.value.assignments.forEach { ReminderScheduler.cancel(getApplication(), it.assignment.id) }
+            assignments.forEach { ReminderScheduler.cancel(getApplication(), it.id) }
         }
+        // 重新开启通知时也必须恢复科目的“作业布置间隔”提醒。
+        refreshSubjectReminders(enabled)
     }
 
     fun checkGithubUpdate(onFinished: (() -> Unit)? = null) {
@@ -208,6 +247,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                                 CalendarSyncManager.deleteEvent(getApplication(), it)
                             }
                         }
+                        repository.subjectsOnce().forEach { subject ->
+                            ReminderScheduler.cancelSubject(getApplication(), subject.id)
+                        }
                     }
                 )
                 val imported = repository.assignmentsOnce()
@@ -226,8 +268,12 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                         }
                     }
                 }
+                // 旧版备份可能缺少科目登记时间，按导入后的最新作业时间恢复提醒。
+                refreshSubjectReminders(settings.notificationsEnabled)
                 WidgetUpdater.requestUpdate(getApplication())
-                announce("导入完成：${summary.assignments} 份作业")
+                announce(
+                    "导入完成：${summary.assignments} 份作业、${summary.attachments} 个附件"
+                )
             } catch (c: CancellationException) {
                 throw c
             } catch (e: Exception) {
@@ -238,14 +284,14 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** 将当前数据库导出为 JSON 文件。 */
+    /** 将当前数据库及图片附件导出为 ZIP 备份。 */
     fun exportJson(uri: Uri) {
         if (_exporting.value) return
         _exporting.value = true
         viewModelScope.launch {
             try {
                 JsonExporter.export(getApplication(), uri, repository)
-                announce("JSON 已导出")
+                announce("ZIP 备份已导出")
             } catch (c: CancellationException) {
                 throw c
             } catch (e: Exception) {

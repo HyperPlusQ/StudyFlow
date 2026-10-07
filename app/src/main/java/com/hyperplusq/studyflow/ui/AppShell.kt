@@ -159,8 +159,8 @@ fun StudyFlowAppUi(viewModel: AppViewModel) {
             initial = editingAssignment,
             state = state,
             onDismiss = { assignmentEditorOpen = false },
-            onSave = { assignment: AssignmentEntity ->
-                viewModel.saveAssignment(assignment)
+            onSave = { assignment: AssignmentEntity, attachments ->
+                viewModel.saveAssignment(assignment, attachments)
                 assignmentEditorOpen = false
             }
         )

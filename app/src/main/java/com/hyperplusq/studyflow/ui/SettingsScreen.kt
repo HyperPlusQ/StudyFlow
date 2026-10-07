@@ -66,11 +66,11 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
         ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) viewModel.setNotificationsEnabled(true)
-        else viewModel.announce("未获得通知权限，截止提醒未开启")
+        else viewModel.announce("未获得通知权限，本地提醒未开启")
     }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument("application/json")
+        ActivityResultContracts.CreateDocument("application/zip")
     ) { uri -> uri?.let(viewModel::exportJson) }
 
     val importLauncher = rememberLauncherForActivityResult(
@@ -120,7 +120,7 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
             title = "本地提醒"
         ) {
             SettingRow(
-                title = "启用截止提醒"
+                title = "启用截止与布置提醒"
             ) {
                 Switch(
                     checked = state.settings.notificationsEnabled,
@@ -192,14 +192,16 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
                     enabled = !exporting && !importing,
                     onClick = {
                         exportLauncher.launch(
-                            "StudyFlow-${System.currentTimeMillis()}.json"
+                            "StudyFlow-${System.currentTimeMillis()}.zip"
                         )
                     }
-                ) { Text("导出 JSON") }
+                ) { Text("导出 ZIP 备份") }
                 Button(
                     enabled = !exporting && !importing,
-                    onClick = { importLauncher.launch(arrayOf("application/json")) }
-                ) { Text("导入 JSON") }
+                    onClick = {
+                        importLauncher.launch(arrayOf("application/zip", "application/json"))
+                    }
+                ) { Text("导入 ZIP/JSON") }
                 if (exporting || importing) {
                     LinearProgressIndicator(Modifier.weight(1f))
                 }
@@ -223,7 +225,7 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
             AlertDialog(
                 onDismissRequest = { pendingImportUri = null },
                 title = { Text("导入 StudyFlow 数据") },
-                text = { Text("导入会覆盖当前设备上的科目、作业、子任务、时间块和提交方式记录。是否继续？") },
+                text = { Text("导入会覆盖当前设备上的科目、作业、子任务、时间块、图片附件和提交方式记录。是否继续？") },
                 confirmButton = {
                     Button(
                         onClick = {

@@ -1,6 +1,7 @@
 package com.hyperplusq.studyflow.ui
 
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -31,6 +32,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -43,6 +45,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 
@@ -113,9 +116,15 @@ fun SubjectsScreen(viewModel: AppViewModel, state: AppUiState) {
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(subject.name, fontWeight = FontWeight.SemiBold)
+                                val summary = buildString {
+                                    append(subject.symbol.ifBlank { "自定义符号" })
+                                    append(if (subject.parentId != null) " · 子科目" else " · 大类")
+                                    subject.assignmentIntervalDays?.let { days ->
+                                        append(" · 每 $days 天提醒登记")
+                                    }
+                                }
                                 Text(
-                                    subject.symbol.ifBlank { "自定义符号" } +
-                                        (if (subject.parentId != null) " · 子科目" else " · 大类"),
+                                    summary,
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -268,6 +277,10 @@ private fun SubjectEditorDialog(
     var color by remember { mutableStateOf(initial?.colorHex ?: subjectColors.first()) }
     var parentId by remember { mutableStateOf(initial?.parentId) }
     var parentMenu by remember { mutableStateOf(false) }
+    var reminderEnabled by remember { mutableStateOf(initial?.assignmentIntervalDays != null) }
+    var intervalDays by remember {
+        mutableStateOf((initial?.assignmentIntervalDays ?: 7).coerceIn(1, 365).toString())
+    }
     val parent = subjects.firstOrNull { it.id == parentId }
     val landscape = isLandscapeDialog()
 
@@ -332,21 +345,56 @@ private fun SubjectEditorDialog(
                         ) {}
                     }
                 }
+
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        "作业布置间隔提醒",
+                        Modifier.weight(1f),
+                        style = MaterialTheme.typography.labelLarge
+                    )
+                    Switch(
+                        checked = reminderEnabled,
+                        onCheckedChange = { reminderEnabled = it }
+                    )
+                }
+                if (reminderEnabled) {
+                    OutlinedTextField(
+                        value = intervalDays,
+                        onValueChange = { input ->
+                            intervalDays = input.filter { it.isDigit() }.take(3)
+                        },
+                        label = { Text("间隔天数（1–365）") },
+                        singleLine = true,
+                        enabled = reminderEnabled,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             })
         },
         confirmButton = {
             Button(
                 enabled = name.isNotBlank(),
                 onClick = {
-                    onSave(
-                        (initial ?: SubjectEntity(name = name)).copy(
-                            name = name.trim(),
-                            symbol = symbol.trim().ifBlank { "menu_book" },
-                            colorHex = color,
-                            parentId = parentId,
-                            sortOrder = initial?.sortOrder ?: subjects.size
-                        )
+                    val interval = if (reminderEnabled) {
+                        intervalDays.toIntOrNull()?.coerceIn(1, 365) ?: 7
+                    } else {
+                        null
+                    }
+                    val subject = (initial ?: SubjectEntity(name = name.trim())).copy(
+                        name = name.trim(),
+                        symbol = symbol.trim().ifBlank { "menu_book" },
+                        colorHex = color,
+                        parentId = parentId,
+                        sortOrder = initial?.sortOrder ?: subjects.size,
+                        assignmentIntervalDays = interval,
+                        lastAssignmentRegisteredAt = initial?.lastAssignmentRegisteredAt
                     )
+                    onSave(subject)
                 }
             ) { Text("保存") }
         },

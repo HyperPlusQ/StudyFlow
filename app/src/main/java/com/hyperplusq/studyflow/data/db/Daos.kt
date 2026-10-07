@@ -95,6 +95,24 @@ interface AssignmentDao {
 }
 
 @Dao
+interface AttachmentDao {
+    @Query("SELECT * FROM attachments WHERE assignmentId = :assignmentId ORDER BY createdAt")
+    suspend fun forAssignment(assignmentId: Long): List<AttachmentEntity>
+
+    @Insert
+    suspend fun insert(attachment: AttachmentEntity): Long
+
+    @Insert
+    suspend fun insertAll(attachments: List<AttachmentEntity>)
+
+    @Query("DELETE FROM attachments WHERE assignmentId = :assignmentId")
+    suspend fun deleteForAssignment(assignmentId: Long)
+
+    @Query("DELETE FROM attachments")
+    suspend fun deleteAll()
+}
+
+@Dao
 interface SubtaskDao {
     @Insert
     suspend fun insert(subtask: SubtaskEntity): Long

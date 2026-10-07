@@ -2,10 +2,12 @@ package com.hyperplusq.studyflow.system
 
 import android.content.Context
 import android.net.Uri
+import android.util.Base64
 import androidx.room.withTransaction
 import com.hyperplusq.studyflow.data.StudyRepository
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
+import com.hyperplusq.studyflow.data.db.AttachmentEntity
 import com.hyperplusq.studyflow.data.db.SubmissionHistoryEntity
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 import com.hyperplusq.studyflow.data.db.SubtaskEntity
@@ -26,9 +28,11 @@ object JsonImporter {
         val assignments: Int,
         val subtasks: Int,
         val timeBlocks: Int,
-        val submissionHistory: Int
+        val submissionHistory: Int,
+        val attachments: Int
     ) {
-        val total: Int get() = subjects + assignments + subtasks + timeBlocks + submissionHistory
+        val total: Int get() =
+            subjects + assignments + subtasks + timeBlocks + submissionHistory + attachments
     }
 
     private data class SubjectRecord(
@@ -38,7 +42,9 @@ object JsonImporter {
         val colorHex: String,
         val parentRawId: String?,
         val sortOrder: Int,
-        val createdAt: Long
+        val createdAt: Long,
+        val assignmentIntervalDays: Int?,
+        val lastAssignmentRegisteredAt: Long?
     )
 
     private data class SubtaskRecord(
@@ -63,8 +69,34 @@ object JsonImporter {
         val updatedAt: Long,
         val completedAt: Long?,
         val calendarEventId: Long?,
-        val subtasks: List<SubtaskRecord>
+        val subtasks: List<SubtaskRecord>,
+        val attachments: List<AttachmentRecord>
     )
+
+    private data class AttachmentRecord(
+        val rawId: String,
+        val fileName: String,
+        val mimeType: String,
+        val imageData: ByteArray,
+        val createdAt: Long
+    ) {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (other !is AttachmentRecord) return false
+            return rawId == other.rawId && fileName == other.fileName &&
+                mimeType == other.mimeType && imageData.contentEquals(other.imageData) &&
+                createdAt == other.createdAt
+        }
+
+        override fun hashCode(): Int {
+            var result = rawId.hashCode()
+            result = 31 * result + fileName.hashCode()
+            result = 31 * result + mimeType.hashCode()
+            result = 31 * result + imageData.contentHashCode()
+            result = 31 * result + createdAt.hashCode()
+            return result
+        }
+    }
 
     private data class TimeBlockRecord(
         val rawId: String,
@@ -98,9 +130,9 @@ object JsonImporter {
         repository: StudyRepository,
         beforeReplace: suspend () -> Unit = {}
     ): Summary {
-        val document = context.contentResolver.openInputStream(uri)?.use { input ->
-            parse(String(input.readBytes(), Charsets.UTF_8))
-        } ?: error("无法读取所选文件")
+        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+            ?: error("无法读取所选文件")
+        val document = parse(String(BackupArchive.readDocument(bytes), Charsets.UTF_8))
 
         validate(document)
         beforeReplace()
@@ -109,6 +141,7 @@ object JsonImporter {
             val dao = repository.database
             dao.submissionHistoryDao().deleteAll()
             dao.timeBlockDao().deleteAll()
+            dao.attachmentDao().deleteAll()
             dao.subtaskDao().deleteAll()
             dao.assignmentDao().deleteAll()
             dao.subjectDao().deleteAll()
@@ -123,7 +156,9 @@ object JsonImporter {
                         colorHex = record.colorHex,
                         parentId = null,
                         sortOrder = record.sortOrder,
-                        createdAt = record.createdAt
+                        createdAt = record.createdAt,
+                        assignmentIntervalDays = record.assignmentIntervalDays,
+                        lastAssignmentRegisteredAt = record.lastAssignmentRegisteredAt
                     )
                 )
             }
@@ -140,7 +175,9 @@ object JsonImporter {
                             colorHex = record.colorHex,
                             parentId = parent,
                             sortOrder = record.sortOrder,
-                            createdAt = record.createdAt
+                            createdAt = record.createdAt,
+                            assignmentIntervalDays = record.assignmentIntervalDays,
+                            lastAssignmentRegisteredAt = record.lastAssignmentRegisteredAt
                         )
                     )
                 }
@@ -175,6 +212,18 @@ object JsonImporter {
                             title = subtask.title,
                             isCompleted = subtask.isCompleted,
                             sortOrder = subtask.sortOrder
+                        )
+                    )
+                }
+                record.attachments.forEach { attachment ->
+                    dao.attachmentDao().insert(
+                        AttachmentEntity(
+                            id = 0,
+                            assignmentId = id,
+                            fileName = attachment.fileName,
+                            mimeType = attachment.mimeType,
+                            imageData = attachment.imageData,
+                            createdAt = attachment.createdAt
                         )
                     )
                 }
@@ -214,7 +263,8 @@ object JsonImporter {
                 assignments = document.assignments.size,
                 subtasks = document.assignments.sumOf { it.subtasks.size },
                 timeBlocks = document.timeBlocks.size,
-                submissionHistory = document.history.size
+                submissionHistory = document.history.size,
+                attachments = document.assignments.sumOf { it.attachments.size }
             )
         }
     }
@@ -239,7 +289,9 @@ object JsonImporter {
         colorHex = obj.optString("colorHex", "#4F6BED"),
         parentRawId = nullableRawId(obj.opt("parentId")),
         sortOrder = obj.optInt("sortOrder", 0),
-        createdAt = dateOrNow(obj.opt("createdAt"))
+        createdAt = dateOrNow(obj.opt("createdAt")),
+        assignmentIntervalDays = nullableInt(obj.opt("assignmentIntervalDays")),
+        lastAssignmentRegisteredAt = nullableDate(obj.opt("lastAssignmentRegisteredAt"))
     )
 
     private fun parseAssignment(obj: JSONObject): AssignmentRecord {
@@ -263,7 +315,8 @@ object JsonImporter {
             createdAt = dateOrNow(obj.opt("createdAt")),
             updatedAt = dateOrNow(obj.opt("updatedAt")),
             completedAt = nullableDate(obj.opt("completedAt")),
-            calendarEventId = nullableLong(obj.opt("calendarEventId")),
+            calendarEventId = nullableLong(obj.opt("calendarEventId"))
+                ?: nullableLong(obj.opt("calendarEventIdentifier")),
             subtasks = obj.optJSONArray("subtasks").orEmpty().map { subtask ->
                 val item = subtask as JSONObject
                 SubtaskRecord(
@@ -271,6 +324,19 @@ object JsonImporter {
                     title = requiredString(item, "title"),
                     isCompleted = item.optBoolean("isCompleted", false),
                     sortOrder = item.optInt("sortOrder", 0)
+                )
+            },
+            attachments = obj.optJSONArray("attachments").orEmpty().map { attachment ->
+                val item = attachment as JSONObject
+                AttachmentRecord(
+                    rawId = rawId(item),
+                    fileName = requiredString(item, "fileName"),
+                    mimeType = item.optString("mimeType", "image/jpeg"),
+                    imageData = Base64.decode(
+                        requiredString(item, "imageData"),
+                        Base64.DEFAULT
+                    ),
+                    createdAt = dateOrNow(item.opt("createdAt"))
                 )
             }
         )
@@ -300,6 +366,7 @@ object JsonImporter {
         requireUnique(document.timeBlocks.map { it.rawId })
         requireUnique(document.history.map { it.rawId })
         requireUnique(document.assignments.flatMap { it.subtasks }.map { it.rawId })
+        requireUnique(document.assignments.flatMap { it.attachments }.map { it.rawId })
 
         val subjects = document.subjects.map { it.rawId }.toSet()
         document.subjects.forEach { record ->
@@ -343,6 +410,12 @@ object JsonImporter {
 
     private fun requiredString(obj: JSONObject, key: String): String =
         obj.optString(key, "").takeIf { it.isNotBlank() } ?: error("快照记录缺少 $key")
+
+    private fun nullableInt(value: Any?): Int? = when {
+        value == null || value == JSONObject.NULL -> null
+        value is Number -> value.toInt()
+        else -> value.toString().toIntOrNull()
+    }
 
     private fun nullableLong(value: Any?): Long? = when {
         value == null || value == JSONObject.NULL -> null

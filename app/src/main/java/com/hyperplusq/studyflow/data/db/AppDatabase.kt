@@ -1,6 +1,7 @@
 package com.hyperplusq.studyflow.data.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
@@ -11,9 +12,11 @@ import androidx.room.RoomDatabase
         AssignmentEntity::class,
         SubtaskEntity::class,
         TimeBlockEntity::class,
-        SubmissionHistoryEntity::class
+        SubmissionHistoryEntity::class,
+        AttachmentEntity::class
     ],
-    version = 1,
+    version = 2,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -22,6 +25,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun subtaskDao(): SubtaskDao
     abstract fun timeBlockDao(): TimeBlockDao
     abstract fun submissionHistoryDao(): SubmissionHistoryDao
+    abstract fun attachmentDao(): AttachmentDao
 
     companion object {
         @Volatile

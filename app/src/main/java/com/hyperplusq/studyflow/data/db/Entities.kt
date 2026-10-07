@@ -35,7 +35,11 @@ data class SubjectEntity(
     val colorHex: String = "#4F6BED",
     val parentId: Long? = null,
     val sortOrder: Int = 0,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    /** 距上一次登记作业多少天后提醒再次登记，null 表示关闭。 */
+    val assignmentIntervalDays: Int? = null,
+    /** 最近一次新建本科目作业的时间，用于布置间隔提醒。 */
+    val lastAssignmentRegisteredAt: Long? = null
 )
 
 @Entity(
@@ -58,6 +62,48 @@ data class AssignmentEntity(
     val completedAt: Long? = null,
     val calendarEventId: Long? = null
 )
+
+@Entity(
+    tableName = "attachments",
+    foreignKeys = [
+        ForeignKey(
+            entity = AssignmentEntity::class,
+            parentColumns = ["id"],
+            childColumns = ["assignmentId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [Index("assignmentId")]
+)
+data class AttachmentEntity(
+    @androidx.room.PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val assignmentId: Long,
+    val fileName: String,
+    val mimeType: String = "image/jpeg",
+    val imageData: ByteArray,
+    val createdAt: Long = System.currentTimeMillis()
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AttachmentEntity) return false
+        return id == other.id &&
+            assignmentId == other.assignmentId &&
+            fileName == other.fileName &&
+            mimeType == other.mimeType &&
+            imageData.contentEquals(other.imageData) &&
+            createdAt == other.createdAt
+    }
+
+    override fun hashCode(): Int {
+        var result = id.hashCode()
+        result = 31 * result + assignmentId.hashCode()
+        result = 31 * result + fileName.hashCode()
+        result = 31 * result + mimeType.hashCode()
+        result = 31 * result + imageData.contentHashCode()
+        result = 31 * result + createdAt.hashCode()
+        return result
+    }
+}
 
 @Entity(
     tableName = "subtasks",
@@ -105,7 +151,9 @@ data class SubmissionHistoryEntity(
 data class AssignmentWithSubtasks(
     @Embedded val assignment: AssignmentEntity,
     @Relation(parentColumn = "id", entityColumn = "assignmentId")
-    val subtasks: List<SubtaskEntity>
+    val subtasks: List<SubtaskEntity>,
+    @Relation(parentColumn = "id", entityColumn = "assignmentId")
+    val attachments: List<AttachmentEntity>
 ) {
     val completedSubtaskCount: Int get() = subtasks.count { it.isCompleted }
     val progress: Float

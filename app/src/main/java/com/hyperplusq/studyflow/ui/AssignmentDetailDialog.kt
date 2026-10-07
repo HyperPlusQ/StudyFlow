@@ -195,6 +195,14 @@ fun AssignmentDetailDialog(
                 }
 
                 }, right = {
+                if (item.attachments.isNotEmpty()) {
+                    Text("图片附件", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    AttachmentStrip(
+                        attachments = item.attachments,
+                        maxVisible = item.attachments.size,
+                        tileSize = 76.dp
+                    )
+                }
                 HorizontalDivider()
                 Text("检查清单", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                 if (item.subtasks.isEmpty()) {
