@@ -217,19 +217,21 @@ private fun CompactLayout(
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            Surface(
-                shape = PillShape,
-                // 不透明底栏可完全遮住导航栏区域，避免内容色块从底栏下方露出。
-                color = MaterialTheme.colorScheme.surfaceContainer,
-                tonalElevation = 0.dp,
-                modifier = Modifier.padding(horizontal = 8.dp)
-            ) {
-                Column(Modifier.fillMaxWidth()) {
+            Column(Modifier.fillMaxWidth()) {
+                Surface(
+                    shape = PillShape,
+                    // 与页面内容保持相同的 20dp 水平边距，并在手势区域上方留出空隙。
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 0.dp,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
+                ) {
                     NavigationBar(
                         containerColor = Color.Transparent,
                         tonalElevation = 0.dp,
                         windowInsets = WindowInsets(0.dp),
-                        modifier = Modifier.padding(top = 4.dp)
+                        modifier = Modifier.height(52.dp)
                     ) {
                         AppTab.entries.forEach { item ->
                             BottomNavigationItem(
@@ -240,9 +242,9 @@ private fun CompactLayout(
                             )
                         }
                     }
-                    // 让手势导航条沉浸到同一块不透明底栏中。
-                    Spacer(Modifier.navigationBarsPadding())
                 }
+                // 手势导航条保留透明区域，避免在底栏下方形成纯色块。
+                Spacer(Modifier.navigationBarsPadding())
             }
         },
         floatingActionButton = {
@@ -289,7 +291,7 @@ private fun RowScope.BottomNavigationItem(
     Box(
         modifier = Modifier
             .weight(1f)
-            .height(64.dp),
+            .height(52.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
