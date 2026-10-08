@@ -220,8 +220,8 @@ private fun CompactLayout(
             Column(Modifier.fillMaxWidth()) {
                 Surface(
                     shape = PillShape,
-                    // 与页面内容保持相同的 20dp 水平边距，并在手势区域上方留出空隙。
-                    color = MaterialTheme.colorScheme.surfaceContainer,
+                    // 与页面内容保持相同的 20dp 水平边距，并使用更深一级的容器色。
+                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
                     tonalElevation = 0.dp,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -231,7 +231,7 @@ private fun CompactLayout(
                         containerColor = Color.Transparent,
                         tonalElevation = 0.dp,
                         windowInsets = WindowInsets(0.dp),
-                        modifier = Modifier.height(52.dp)
+                        modifier = Modifier.height(56.dp)
                     ) {
                         AppTab.entries.forEach { item ->
                             BottomNavigationItem(
@@ -291,7 +291,7 @@ private fun RowScope.BottomNavigationItem(
     Box(
         modifier = Modifier
             .weight(1f)
-            .height(52.dp),
+            .height(56.dp),
         contentAlignment = Alignment.Center
     ) {
         Box(
@@ -300,7 +300,7 @@ private fun RowScope.BottomNavigationItem(
                 .clip(CircleShape)
                 .background(
                     when {
-                        selected -> MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                        selected -> MaterialTheme.colorScheme.primaryContainer
                         pressed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
                         else -> Color.Transparent
                     }
