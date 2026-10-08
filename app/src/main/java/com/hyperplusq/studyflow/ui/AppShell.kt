@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -50,7 +51,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -61,6 +61,9 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
+
+// 竖屏底栏与横屏侧边栏统一使用真正的胶囊圆角。
+private val PillShape = RoundedCornerShape(percent = 50)
 
 enum class AppTab(val title: String) {
     DASHBOARD("概览"),
@@ -215,25 +218,18 @@ private fun CompactLayout(
         containerColor = Color.Transparent,
         bottomBar = {
             Surface(
-                shape = RoundedCornerShape(40.dp),
+                shape = PillShape,
                 // 不透明底栏可完全遮住导航栏区域，避免内容色块从底栏下方露出。
                 color = MaterialTheme.colorScheme.surfaceContainer,
                 tonalElevation = 0.dp,
-                modifier = Modifier
-                    .shadow(
-                        elevation = 16.dp,
-                        shape = RoundedCornerShape(40.dp),
-                        clip = false,
-                        ambientColor = Color.Black,
-                        spotColor = Color.Black
-                    )
-                    .padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 8.dp)
             ) {
                 Column(Modifier.fillMaxWidth()) {
                     NavigationBar(
                         containerColor = Color.Transparent,
                         tonalElevation = 0.dp,
-                        modifier = Modifier.padding(top = 10.dp)
+                        windowInsets = WindowInsets(0.dp),
+                        modifier = Modifier.padding(top = 4.dp)
                     ) {
                         AppTab.entries.forEach { item ->
                             BottomNavigationItem(
@@ -388,12 +384,12 @@ private fun LargeLayout(
         Surface(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(top = 14.dp, bottom = 14.dp, end = 14.dp)
+                .padding(top = 8.dp, bottom = 8.dp, end = 8.dp)
                 .width(panelWidth)
                 .fillMaxHeight(),
-            shape = RoundedCornerShape(34.dp),
+            shape = PillShape,
             color = MaterialTheme.colorScheme.surfaceContainer,
-            tonalElevation = 5.dp
+            tonalElevation = 0.dp
         ) {
             SidebarContent(
                 state = state,
@@ -423,7 +419,7 @@ private fun SidebarContent(
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (onNewAssignment != null) {
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             FloatingActionButton(
                 onClick = onNewAssignment,
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -449,7 +445,7 @@ private fun SidebarContent(
             Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(top = 10.dp),
+                .padding(top = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             AppTab.entries.forEach { item ->
@@ -457,7 +453,13 @@ private fun SidebarContent(
                     selected = tab == item,
                     onClick = { onTab(item) },
                     contentDescription = item.title,
-                    icon = { Icon(tabIcon(item), contentDescription = null) }
+                    icon = {
+                        Icon(
+                            tabIcon(item),
+                            contentDescription = null,
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
                 )
             }
 
@@ -493,8 +495,7 @@ private fun IconNavigationItem(
 ) {
     Box(
         Modifier
-            .padding(horizontal = 12.dp, vertical = 4.dp)
-            .size(56.dp)
+            .size(64.dp)
             .clip(CircleShape)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -529,8 +530,7 @@ private fun SubjectFilterIcon(
 ) {
     Box(
         Modifier
-            .padding(horizontal = 16.dp, vertical = 5.dp)
-            .size(48.dp)
+            .size(56.dp)
             .clip(CircleShape)
             .background(
                 if (selected) MaterialTheme.colorScheme.primaryContainer
@@ -547,13 +547,13 @@ private fun SubjectFilterIcon(
             Icon(
                 Icons.Outlined.Layers,
                 contentDescription = null,
-                modifier = Modifier.size(22.dp),
+                modifier = Modifier.size(24.dp),
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         } else {
             Box(
                 Modifier
-                    .size(18.dp)
+                    .size(22.dp)
                     .clip(CircleShape)
                     .background(color)
             )
