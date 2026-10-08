@@ -18,6 +18,21 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.automirrored.outlined.Article
+import androidx.compose.material.icons.outlined.BusinessCenter
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Eco
+import androidx.compose.material.icons.outlined.Favorite
+import androidx.compose.material.icons.outlined.Functions
+import androidx.compose.material.icons.outlined.HistoryEdu
+import androidx.compose.material.icons.outlined.Language
+import androidx.compose.material.icons.outlined.Lightbulb
+import androidx.compose.material.icons.automirrored.outlined.MenuBook
+import androidx.compose.material.icons.outlined.MusicNote
+import androidx.compose.material.icons.outlined.Palette
+import androidx.compose.material.icons.outlined.Public
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.School
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.LinkOff
@@ -44,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -53,6 +69,30 @@ private val subjectColors = listOf(
     "#4F6BED", "#006C5A", "#B54708", "#9E1B32", "#6941C6",
     "#026AA7", "#067647", "#B42318", "#7A5AF8", "#4E5BA6"
 )
+
+private data class SubjectIconOption(val key: String, val label: String, val icon: ImageVector)
+
+/** 科目标记的稳定键与图形图标；导入数据中的未知值会安全回退到默认图标。 */
+private val subjectIconOptions = listOf(
+    SubjectIconOption("menu_book", "书本", Icons.AutoMirrored.Outlined.MenuBook),
+    SubjectIconOption("functions", "数学", Icons.Outlined.Functions),
+    SubjectIconOption("science", "科学", Icons.Outlined.Science),
+    SubjectIconOption("language", "语言", Icons.Outlined.Language),
+    SubjectIconOption("palette", "艺术", Icons.Outlined.Palette),
+    SubjectIconOption("music_note", "音乐", Icons.Outlined.MusicNote),
+    SubjectIconOption("code", "编程", Icons.Outlined.Code),
+    SubjectIconOption("history_edu", "历史", Icons.Outlined.HistoryEdu),
+    SubjectIconOption("public", "地理", Icons.Outlined.Public),
+    SubjectIconOption("lightbulb", "创意", Icons.Outlined.Lightbulb),
+    SubjectIconOption("business_center", "职业", Icons.Outlined.BusinessCenter),
+    SubjectIconOption("eco", "自然", Icons.Outlined.Eco),
+    SubjectIconOption("favorite", "健康", Icons.Outlined.Favorite),
+    SubjectIconOption("school", "通识", Icons.Outlined.School),
+    SubjectIconOption("article", "阅读", Icons.AutoMirrored.Outlined.Article)
+)
+
+private fun subjectIcon(symbol: String): ImageVector =
+    subjectIconOptions.firstOrNull { it.key == symbol }?.icon ?: Icons.AutoMirrored.Outlined.MenuBook
 
 @Composable
 fun SubjectsScreen(viewModel: AppViewModel, state: AppUiState) {
@@ -113,12 +153,17 @@ fun SubjectsScreen(viewModel: AppViewModel, state: AppUiState) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             BoxColor(subject.colorHex)
+                            Icon(
+                                imageVector = subjectIcon(subject.symbol),
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                             Spacer(Modifier.width(12.dp))
                             Column(Modifier.weight(1f)) {
                                 Text(subject.name, fontWeight = FontWeight.SemiBold)
                                 val summary = buildString {
-                                    append(subject.symbol.ifBlank { "自定义符号" })
-                                    append(if (subject.parentId != null) " · 子科目" else " · 大类")
+                                    append(if (subject.parentId != null) "子科目" else "大类")
                                     subject.assignmentIntervalDays?.let { days ->
                                         append(" · 每 $days 天提醒登记")
                                     }
@@ -273,7 +318,11 @@ private fun SubjectEditorDialog(
     onSave: (SubjectEntity) -> Unit
 ) {
     var name by remember { mutableStateOf(initial?.name ?: "") }
-    var symbol by remember { mutableStateOf(initial?.symbol ?: "menu_book") }
+    var symbol by remember {
+        mutableStateOf(
+            subjectIconOptions.firstOrNull { it.key == initial?.symbol }?.key ?: "menu_book"
+        )
+    }
     var color by remember { mutableStateOf(initial?.colorHex ?: subjectColors.first()) }
     var parentId by remember { mutableStateOf(initial?.parentId) }
     var parentMenu by remember { mutableStateOf(false) }
@@ -301,13 +350,46 @@ private fun SubjectEditorDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                OutlinedTextField(
-                    value = symbol,
-                    onValueChange = { symbol = it },
-                    label = { Text("符号（仅作标记）") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Text("科目标记", style = MaterialTheme.typography.labelLarge)
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    subjectIconOptions.forEach { option ->
+                        val selected = symbol == option.key
+                        Surface(
+                            onClick = { symbol = option.key },
+                            shape = RoundedCornerShape(12.dp),
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primaryContainer
+                            } else {
+                                MaterialTheme.colorScheme.surfaceContainer
+                            },
+                            modifier = Modifier.size(44.dp),
+                            border = if (selected) {
+                                androidx.compose.foundation.BorderStroke(
+                                    2.dp,
+                                    MaterialTheme.colorScheme.primary
+                                )
+                            } else {
+                                null
+                            }
+                        ) {
+                            Icon(
+                                imageVector = option.icon,
+                                contentDescription = option.label,
+                                modifier = Modifier.padding(10.dp),
+                                tint = if (selected) {
+                                    MaterialTheme.colorScheme.onPrimaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                    }
+                }
 
                 Text("层级", style = MaterialTheme.typography.labelLarge)
                 OutlinedButton(
@@ -387,7 +469,7 @@ private fun SubjectEditorDialog(
                     }
                     val subject = (initial ?: SubjectEntity(name = name.trim())).copy(
                         name = name.trim(),
-                        symbol = symbol.trim().ifBlank { "menu_book" },
+                        symbol = subjectIconOptions.firstOrNull { it.key == symbol }?.key ?: "menu_book",
                         colorHex = color,
                         parentId = parentId,
                         sortOrder = initial?.sortOrder ?: subjects.size,

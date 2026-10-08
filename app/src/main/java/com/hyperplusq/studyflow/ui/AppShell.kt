@@ -51,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
@@ -111,8 +112,6 @@ fun StudyFlowAppUi(viewModel: AppViewModel) {
         val compactPortrait = maxWidth < 600.dp && maxHeight >= maxWidth
         // A compact, icon-only floating rail keeps more room for content in landscape.
         val panelWidth = 88.dp
-
-        AppBackground()
 
         if (compactPortrait) {
             CompactLayout(
@@ -198,15 +197,6 @@ fun StudyFlowAppUi(viewModel: AppViewModel) {
 }
 
 @Composable
-private fun AppBackground() {
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
-    )
-}
-
-@Composable
     /** 手机竖屏使用底栏和正常内容布局。 */
 private fun CompactLayout(
     viewModel: AppViewModel,
@@ -230,6 +220,13 @@ private fun CompactLayout(
                 color = Color.Transparent,
                 tonalElevation = 0.dp,
                 modifier = Modifier
+                    .shadow(
+                        elevation = 16.dp,
+                        shape = RoundedCornerShape(40.dp),
+                        clip = false,
+                        ambientColor = Color.Black,
+                        spotColor = Color.Black
+                    )
                     .padding(horizontal = 16.dp, vertical = 10.dp)
                     .navigationBarsPadding()
             ) {
@@ -282,7 +279,8 @@ private fun CompactLayout(
             tab = tab,
             selectedSubjectId = selectedSubjectId,
             onSelectSubject = onSelectSubject,
-            modifier = Modifier.padding(padding),
+            // Only reserve top inset; content continues behind the floating bar.
+            modifier = Modifier.padding(top = padding.calculateTopPadding()),
             message = message,
             onOpenAssignment = onOpenAssignment,
             onEditAssignment = onEditAssignment,
@@ -487,7 +485,7 @@ private fun SidebarContent(
                         selected = selectedSubjectId == subject.id,
                         onClick = { onSelectSubject(subject.id) },
                         contentDescription = subject.name,
-                        color = subject.colorHex?.toComposeColorOrNull()
+                        color = subject.colorHex.toComposeColorOrNull()
                     )
                 }
             }
