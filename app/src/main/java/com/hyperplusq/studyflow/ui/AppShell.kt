@@ -50,7 +50,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
@@ -217,7 +216,8 @@ private fun CompactLayout(
         bottomBar = {
             Surface(
                 shape = RoundedCornerShape(40.dp),
-                color = Color.Transparent,
+                // 不透明底栏可完全遮住导航栏区域，避免内容色块从底栏下方露出。
+                color = MaterialTheme.colorScheme.surfaceContainer,
                 tonalElevation = 0.dp,
                 modifier = Modifier
                     .shadow(
@@ -227,24 +227,13 @@ private fun CompactLayout(
                         ambientColor = Color.Black,
                         spotColor = Color.Black
                     )
-                    .padding(horizontal = 16.dp, vertical = 10.dp)
-                    .navigationBarsPadding()
+                    .padding(horizontal = 16.dp)
             ) {
-                Box(Modifier.fillMaxWidth()) {
-                    // A softly blurred translucent layer keeps the pill background airy
-                    // without blurring the navigation icons themselves.
-                    Box(
-                        Modifier
-                            .matchParentSize()
-                            .clip(RoundedCornerShape(40.dp))
-                            .blur(18.dp)
-                            .background(
-                                MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f)
-                            )
-                    )
+                Column(Modifier.fillMaxWidth()) {
                     NavigationBar(
                         containerColor = Color.Transparent,
-                        tonalElevation = 0.dp
+                        tonalElevation = 0.dp,
+                        modifier = Modifier.padding(top = 10.dp)
                     ) {
                         AppTab.entries.forEach { item ->
                             BottomNavigationItem(
@@ -255,6 +244,8 @@ private fun CompactLayout(
                             )
                         }
                     }
+                    // 让手势导航条沉浸到同一块不透明底栏中。
+                    Spacer(Modifier.navigationBarsPadding())
                 }
             }
         },
