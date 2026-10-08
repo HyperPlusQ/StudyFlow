@@ -92,8 +92,9 @@ struct AssignmentListView: View {
                 .accessibilityLabel("筛选")
                 .popover(isPresented: $showFilters, arrowEdge: .bottom) {
                     FilterPopover(filter: $filter, subjects: subjects)
-                        .frame(maxWidth: 340)
                 }
+                // 紧凑设备上也保持小型弹窗，不自动放大成整页背景。
+                .presentationCompactAdaptation(.popover)
                 Button(action: onNewAssignment) {
                     SafeSystemImage(systemName: "plus", fallback: "circle")
                 }
@@ -342,12 +343,13 @@ private struct FilterPopover: View {
     @Binding var filter: AssignmentFilter
     let subjects: [Subject]
 
+    /// 使用固定宽度的紧凑玻璃面板，避免筛选卡片铺满过大的系统弹窗背景。
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 8) {
                 Label("筛选", systemImage: "line.3.horizontal.decrease")
                     .font(.headline)
-                Spacer()
+                Spacer(minLength: 8)
                 if !filter.isDefault {
                     Button("重置") { filter.reset() }
                         .buttonStyle(.borderless)
@@ -355,13 +357,7 @@ private struct FilterPopover: View {
                 }
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(), spacing: 10),
-                    GridItem(.flexible(), spacing: 10)
-                ],
-                spacing: 10
-            ) {
+            HStack(spacing: 8) {
                 FilterCard(title: "截止日期", icon: "calendar") {
                     Picker("截止日期", selection: $filter.dueWindow) {
                         ForEach(DueWindow.allCases) { Text($0.label).tag($0) }
@@ -382,20 +378,13 @@ private struct FilterPopover: View {
                     .pickerStyle(.menu)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
 
-                FilterCard(title: "仅含子任务", icon: "checklist") {
-                    Toggle("仅含子任务", isOn: $filter.hasChecklistOnly)
-                        .labelsHidden()
-                        .toggleStyle(.switch)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                FilterCard(title: "筛选状态", icon: "slider.horizontal.3") {
-                    Text(filter.isDefault ? "默认条件" : "已应用筛选")
-                        .font(.subheadline)
-                        .foregroundStyle(filter.isDefault ? .secondary : Color.accentColor)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
+            FilterCard(title: "仅含子任务", icon: "checklist") {
+                Toggle("仅含子任务", isOn: $filter.hasChecklistOnly)
+                    .labelsHidden()
+                    .toggleStyle(.switch)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
 
             FilterCard(title: "科目", icon: "book.closed") {
@@ -410,7 +399,10 @@ private struct FilterPopover: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
-        .padding(14)
+        .padding(12)
+        .frame(width: 300, alignment: .leading)
+        .studyFlowGlassSurface(cornerRadius: 20)
+        .presentationBackground(.clear)
     }
 }
 

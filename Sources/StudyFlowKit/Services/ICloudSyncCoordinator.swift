@@ -157,8 +157,8 @@ final class ICloudSyncCoordinator {
             // 写入本地镜像时保留原时间戳，交由同步逻辑按新旧文件比较。
             if localExists {
                 let localDate = try DataExportService.modificationDate(of: localURL)
-                try DataExportService.write(
-                    DataExportService.currentData(context: context),
+                try DataExportService.writeCurrentBackup(
+                    context: context,
                     to: localURL,
                     modificationDate: localDate
                 )
@@ -240,12 +240,11 @@ final class ICloudSyncCoordinator {
     /// 数据变更后刷新本地同步比较文件。
     func refreshLocalSnapshotIfNeeded(context: ModelContext) {
         guard isEnabled, let localURL = try? localSyncURL() else { return }
-        guard FileManager.default.fileExists(atPath: localURL.path) else { return }
 
         do {
-            // 本地编辑后刷新时间戳，确保下次同步能够将新内容写入 iCloud。
-            try DataExportService.write(
-                DataExportService.currentData(context: context),
+            // 首次编辑也必须创建比较文件；更新内容时刷新时间戳，确保下次同步能上传新 ZIP。
+            try DataExportService.writeCurrentBackup(
+                context: context,
                 to: localURL,
                 modificationDate: .now
             )

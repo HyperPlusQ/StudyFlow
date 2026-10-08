@@ -40,7 +40,7 @@ enum GitHubUpdateService {
     )!
 
     /// 与 Xcode 工程版本保持一致，应用包缺失时也能报告正确版本。
-    static let bundledVersion = "1.6.0"
+    static let bundledVersion = "1.6.1"
 
     static var currentVersion: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? bundledVersion

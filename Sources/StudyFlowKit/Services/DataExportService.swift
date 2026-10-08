@@ -83,14 +83,32 @@ enum DataExportService {
         let lastUsedAt: Date
     }
 
-    /// 将当前数据库编码为 JSON 数据。
+    /// 将当前数据库编码为完整的 ZIP 备份。
     @MainActor
     static func currentData(context: ModelContext) throws -> Data {
-        let subjects = try context.fetch(FetchDescriptor<Subject>())
-        let assignments = try context.fetch(FetchDescriptor<Assignment>())
-        let timeBlocks = try context.fetch(FetchDescriptor<TimeBlock>())
-        let submissionHistory = try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
-        return try archive(
+        try makeBackup(context: context)
+    }
+
+    /// 普通导出与 iCloud 同步共用的 ZIP 备份核心。
+    @MainActor
+    static func makeBackup(context: ModelContext) throws -> Data {
+        try makeBackup(
+            subjects: try context.fetch(FetchDescriptor<Subject>()),
+            assignments: try context.fetch(FetchDescriptor<Assignment>()),
+            timeBlocks: try context.fetch(FetchDescriptor<TimeBlock>()),
+            submissionHistory: try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
+        )
+    }
+
+    /// 从已经取得的数据集合生成 ZIP，避免导出和同步各自维护不同实现。
+    @MainActor
+    static func makeBackup(
+        subjects: [Subject],
+        assignments: [Assignment],
+        timeBlocks: [TimeBlock],
+        submissionHistory: [SubmissionHistoryEntry]
+    ) throws -> Data {
+        try archive(
             json: try encodedDocument(
                 subjects: subjects,
                 assignments: assignments,
@@ -99,6 +117,19 @@ enum DataExportService {
             ),
             assignments: assignments
         )
+    }
+
+    /// 用当前数据库刷新同步文件，并显式写入用于新旧比较的时间戳。
+    @discardableResult
+    @MainActor
+    static func writeCurrentBackup(
+        context: ModelContext,
+        to url: URL,
+        modificationDate: Date? = nil
+    ) throws -> Data {
+        let data = try makeBackup(context: context)
+        try write(data, to: url, modificationDate: modificationDate)
+        return data
     }
 
     /// 完整校验 JSON 快照后再恢复到当前数据库。
