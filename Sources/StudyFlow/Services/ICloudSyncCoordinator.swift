@@ -147,8 +147,8 @@ final class ICloudSyncCoordinator {
             // its file timestamp until an explicit newer-wins comparison.
             if localExists {
                 let localDate = try DataExportService.modificationDate(of: localURL)
-                try DataExportService.write(
-                    DataExportService.currentData(context: context),
+                try DataExportService.writeCurrentBackup(
+                    context: context,
                     to: localURL,
                     modificationDate: localDate
                 )
@@ -230,13 +230,11 @@ final class ICloudSyncCoordinator {
     /// 数据变更后刷新本地同步比较文件。
     func refreshLocalSnapshotIfNeeded(context: ModelContext) {
         guard isEnabled, let localURL = try? localSyncURL() else { return }
-        guard FileManager.default.fileExists(atPath: localURL.path) else { return }
 
         do {
-            // A local edit must make the local comparison file newer than the
-            // last synchronized iCloud copy so the next sync can propagate it.
-            try DataExportService.write(
-                DataExportService.currentData(context: context),
+            // 首次编辑也创建比较文件；更新内容时刷新时间戳，确保下次同步上传新 ZIP。
+            try DataExportService.writeCurrentBackup(
+                context: context,
                 to: localURL,
                 modificationDate: .now
             )

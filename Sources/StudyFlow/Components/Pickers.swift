@@ -32,28 +32,31 @@ struct ColorSwatchPicker: View {
     let colors: [String]
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(colors, id: \.self) { hex in
-                Button {
-                    selection = hex
-                } label: {
-                    ZStack {
-                        Circle()
-                            .fill(Color(hex: hex))
-                            .frame(width: 22, height: 22)
-                        if selection == hex {
-                            Image(systemName: "checkmark")
-                                .font(.caption2.bold())
-                                .foregroundStyle(Color.readableForeground(onHex: hex))
+        // Keep the 44pt swatches in a single horizontal strip so the Form never overflows.
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 0) {
+                ForEach(colors, id: \.self) { hex in
+                    Button {
+                        selection = hex
+                    } label: {
+                        ZStack {
+                            Circle()
+                                .fill(Color(hex: hex))
+                                .frame(width: 22, height: 22)
+                            if selection == hex {
+                                Image(systemName: "checkmark")
+                                    .font(.caption2.bold())
+                                    .foregroundStyle(Color.readableForeground(onHex: hex))
+                            }
                         }
+                        .frame(width: 44, height: 44)
+                        .contentShape(Circle().inset(by: 11))
                     }
-                    .frame(width: 44, height: 44)
-                    .contentShape(Circle().inset(by: 11))
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("颜色 \(hex)")
+                    .accessibilityAddTraits(selection == hex ? .isSelected : [])
+                    .help(hex)
                 }
-                .buttonStyle(.borderless)
-                .accessibilityLabel("颜色 \(hex)")
-                .accessibilityAddTraits(selection == hex ? .isSelected : [])
-                .help(hex)
             }
         }
     }
