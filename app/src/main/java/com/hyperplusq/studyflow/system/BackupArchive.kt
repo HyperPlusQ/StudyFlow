@@ -44,6 +44,23 @@ object BackupArchive {
         error("ZIP 备份中缺少 studyflow.json")
     }
 
+    /**
+     * 顺序扫描 ZIP，返回首个路径命中的条目内容。
+     * 用于 JSON 缺少 image data 时，从 attachments/ 目录按需回退读取单个图片文件。
+     */
+    fun findEntry(bytes: ByteArray, matches: (String) -> Boolean): ByteArray? {
+        if (!isArchive(bytes)) return null
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory && matches(entry.name)) {
+                    return zip.readBytes()
+                }
+            }
+        }
+        return null
+    }
+
     fun isArchive(bytes: ByteArray): Boolean =
         bytes.size >= 4 &&
             bytes[0] == 'P'.code.toByte() &&

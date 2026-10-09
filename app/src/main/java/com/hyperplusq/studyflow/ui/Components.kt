@@ -1,6 +1,5 @@
 package com.hyperplusq.studyflow.ui
 
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -240,6 +239,7 @@ fun AttachmentStrip(
     if (attachments.isEmpty()) return
     val visible = attachments.take(maxVisible)
     val hidden = attachments.size - visible.size
+    val openPreview = rememberImagePreviewLauncher()
     Row(
         modifier = modifier.horizontalScroll(rememberScrollState()),
         horizontalArrangement = Arrangement.spacedBy(7.dp),
@@ -250,6 +250,7 @@ fun AttachmentStrip(
                 Modifier
                     .size(tileSize)
                     .clip(RoundedCornerShape(if (tileSize > 60.dp) 18.dp else 12.dp))
+                    .clickable { openPreview(attachment) }
             ) {
                 AttachmentPreview(
                     attachment = attachment,
@@ -275,29 +276,27 @@ fun AttachmentStrip(
 }
 
 /**
- * 解码并裁切显示附件图片；调用方通过尺寸控制缩略图或详情画廊的大小。
+ * 显示附件缩略图：后台按采样率解码并走缓存，列表滚动时不会重复解原图。
  */
 @Composable
 fun AttachmentPreview(
     attachment: AttachmentEntity,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = remember(attachment.id, attachment.imageData.contentHashCode()) {
-        BitmapFactory.decodeByteArray(
-            attachment.imageData,
-            0,
-            attachment.imageData.size
-        )?.asImageBitmap()
-    }
-    if (bitmap != null) {
-        Image(
-            bitmap = bitmap,
+    val state by rememberAttachmentThumbnail(attachment)
+    when (val current = state) {
+        DecodedImage.Loading -> Box(
+            modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest)
+        )
+
+        is DecodedImage.Ready -> Image(
+            bitmap = current.bitmap.asImageBitmap(),
             contentDescription = attachment.fileName,
             modifier = modifier,
             contentScale = ContentScale.Crop
         )
-    } else {
-        Box(
+
+        DecodedImage.Failed -> Box(
             modifier.background(MaterialTheme.colorScheme.surfaceContainerHighest),
             contentAlignment = Alignment.Center
         ) {

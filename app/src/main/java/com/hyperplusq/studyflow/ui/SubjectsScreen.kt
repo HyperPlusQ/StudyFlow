@@ -62,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.SubjectEntity
 
@@ -95,7 +96,11 @@ private fun subjectIcon(symbol: String): ImageVector =
     subjectIconOptions.firstOrNull { it.key == symbol }?.icon ?: Icons.AutoMirrored.Outlined.MenuBook
 
 @Composable
-fun SubjectsScreen(viewModel: AppViewModel, state: AppUiState) {
+fun SubjectsScreen(
+    viewModel: AppViewModel,
+    state: AppUiState,
+    bottomContentPadding: Dp = 0.dp
+) {
     var editing by remember { mutableStateOf<SubjectEntity?>(null) }
     var editorOpen by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf<SubjectEntity?>(null) }
@@ -105,7 +110,7 @@ fun SubjectsScreen(viewModel: AppViewModel, state: AppUiState) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

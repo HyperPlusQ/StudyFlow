@@ -25,14 +25,15 @@ enum class DueWindow(val title: String) {
     NO_DATE("无截止日期");
 
     fun contains(epochMillis: Long?, now: Long = System.currentTimeMillis()): Boolean {
-        val date = epochMillis ?: return this == NO_DATE
+        // 没有截止日期的作业属于“全部日期”和“无截止日期”，不应被默认筛选隐藏。
+        if (epochMillis == null) return this == ALL || this == NO_DATE
         if (this == NO_DATE) return false
         val zone = ZoneId.systemDefault()
-        val taskDate = Instant.ofEpochMilli(date).atZone(zone).toLocalDate()
+        val taskDate = Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate()
         val today = Instant.ofEpochMilli(now).atZone(zone).toLocalDate()
         return when (this) {
             ALL -> true
-            OVERDUE -> date < now
+            OVERDUE -> epochMillis < now
             TODAY -> taskDate == today
             WEEK -> !taskDate.isBefore(today) && !taskDate.isAfter(today.plusDays(7))
             NO_DATE -> false

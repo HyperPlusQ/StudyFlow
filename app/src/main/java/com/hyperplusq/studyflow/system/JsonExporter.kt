@@ -2,10 +2,10 @@ package com.hyperplusq.studyflow.system
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import com.hyperplusq.studyflow.data.StudyRepository
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
 import java.nio.charset.StandardCharsets
+import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -13,6 +13,17 @@ import org.json.JSONObject
 object JsonExporter {
     /** 将数据库内容写入 ZIP；JSON 与图片附件封装在同一备份中。 */
     suspend fun export(context: Context, uri: Uri, repository: StudyRepository) {
+        val archive = buildArchive(repository)
+        context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
+            output.write(archive)
+        } ?: error("无法打开导出文件")
+    }
+
+    /**
+     * 构建完整备份包：studyflow.json（内嵌 Base64 图片，供三端 JSON 解析），
+     * 以及 attachments/ 目录下的原始图片文件（供需要直接读文件的场景使用）。
+     */
+    internal suspend fun buildArchive(repository: StudyRepository): ByteArray {
         val assignments = repository.assignmentsOnce()
         val document = buildDocument(repository, assignments)
         val entries = mutableListOf(
@@ -26,10 +37,7 @@ object JsonExporter {
                 entries += path to attachment.imageData
             }
         }
-        val archive = BackupArchive.create(entries)
-        context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
-            output.write(archive)
-        } ?: error("无法打开导出文件")
+        return BackupArchive.create(entries)
     }
 
     /** 构建可由 macOS/iOS/Android 共同读取的 JSON 文档。 */
@@ -103,7 +111,8 @@ object JsonExporter {
                                     put("mimeType", attachment.mimeType)
                                     put(
                                         "imageData",
-                                        Base64.encodeToString(attachment.imageData, Base64.NO_WRAP)
+                                        // 与 macOS/iOS 一致：JSON 内嵌 Base64，ZIP 中同时保留原始图片文件。
+                                        Base64.getEncoder().encodeToString(attachment.imageData)
                                     )
                                     put("createdAt", attachment.createdAt)
                                 })

@@ -2,7 +2,6 @@ package com.hyperplusq.studyflow.system
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import androidx.room.withTransaction
 import com.hyperplusq.studyflow.data.StudyRepository
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
@@ -14,6 +13,7 @@ import com.hyperplusq.studyflow.data.db.SubtaskEntity
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
 import java.time.Instant
 import java.time.OffsetDateTime
+import java.util.Base64
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -22,6 +22,10 @@ import org.json.JSONObject
  * and StudyFlow macOS snapshots (UUIDs / ISO-8601 dates). The complete document
  * is parsed and validated before the destructive replacement is started.
  */
+
+/** JSON 中缺少 image data 时，按作业/附件标识回退读取 ZIP 里的图片条目。 */
+internal typealias ResolveFile = (assignmentRawId: String, attachmentRawId: String) -> ByteArray?
+
 object JsonImporter {
     data class Summary(
         val subjects: Int,
@@ -29,13 +33,21 @@ object JsonImporter {
         val subtasks: Int,
         val timeBlocks: Int,
         val submissionHistory: Int,
-        val attachments: Int
+        val attachments: Int,
+        /** 图片数据损坏或缺失、无法恢复时被跳过的附件数量。 */
+        val skippedAttachments: Int = 0
     ) {
         val total: Int get() =
             subjects + assignments + subtasks + timeBlocks + submissionHistory + attachments
     }
 
-    private data class SubjectRecord(
+    /** 附件解析时的统计，用于把“跳过损坏附件”这类局部异常汇总给用户。 */
+    private class ParseStats {
+        var skippedAttachments: Int = 0
+    }
+
+
+    internal data class SubjectRecord(
         val rawId: String,
         val name: String,
         val symbol: String,
@@ -47,14 +59,14 @@ object JsonImporter {
         val lastAssignmentRegisteredAt: Long?
     )
 
-    private data class SubtaskRecord(
+    internal data class SubtaskRecord(
         val rawId: String,
         val title: String,
         val isCompleted: Boolean,
         val sortOrder: Int
     )
 
-    private data class AssignmentRecord(
+    internal data class AssignmentRecord(
         val rawId: String,
         val title: String,
         val details: String,
@@ -73,7 +85,7 @@ object JsonImporter {
         val attachments: List<AttachmentRecord>
     )
 
-    private data class AttachmentRecord(
+    internal data class AttachmentRecord(
         val rawId: String,
         val fileName: String,
         val mimeType: String,
@@ -98,7 +110,7 @@ object JsonImporter {
         }
     }
 
-    private data class TimeBlockRecord(
+    internal data class TimeBlockRecord(
         val rawId: String,
         val title: String,
         val assignmentRawId: String?,
@@ -109,18 +121,20 @@ object JsonImporter {
         val createdAt: Long
     )
 
-    private data class HistoryRecord(
+    internal data class HistoryRecord(
         val rawId: String,
         val subjectRawId: String,
         val method: String,
         val lastUsedAt: Long
     )
 
-    private data class Document(
+    internal data class Document(
         val subjects: List<SubjectRecord>,
         val assignments: List<AssignmentRecord>,
         val timeBlocks: List<TimeBlockRecord>,
-        val history: List<HistoryRecord>
+        val history: List<HistoryRecord>,
+        /** 解析过程中因图片数据缺失或损坏而被跳过的附件数量。 */
+        val skippedAttachments: Int = 0
     )
 
     /** 校验并用 JSON 内容替换当前数据库。 */
@@ -132,7 +146,13 @@ object JsonImporter {
     ): Summary {
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: error("无法读取所选文件")
-        val document = parse(String(BackupArchive.readDocument(bytes), Charsets.UTF_8))
+        // JSON 里的图片数据缺失或损坏时，回退到 ZIP 的 attachments/ 条目按需读取。
+        val document = parse(String(BackupArchive.readDocument(bytes), Charsets.UTF_8)) {
+                assignmentRawId, attachmentRawId ->
+            BackupArchive.findEntry(bytes) { path ->
+                path.startsWith("attachments/$assignmentRawId/$attachmentRawId")
+            }
+        }
 
         validate(document)
         beforeReplace()
@@ -264,22 +284,26 @@ object JsonImporter {
                 subtasks = document.assignments.sumOf { it.subtasks.size },
                 timeBlocks = document.timeBlocks.size,
                 submissionHistory = document.history.size,
-                attachments = document.assignments.sumOf { it.attachments.size }
+                attachments = document.assignments.sumOf { it.attachments.size },
+                skippedAttachments = document.skippedAttachments
             )
         }
     }
 
-    private fun parse(json: String): Document {
+    internal fun parse(json: String, resolveFile: ResolveFile): Document {
         val root = JSONObject(json)
         val hasFormat = root.optString("format") == "StudyFlow"
         val hasSchema = root.has("schemaVersion") && root.optString("app", "StudyFlow") == "StudyFlow"
         if (!hasFormat && !hasSchema) error("所选文件不是 StudyFlow 数据快照")
 
+        val stats = ParseStats()
         val subjects = root.optJSONArray("subjects").orEmpty().map { parseSubject(it as JSONObject) }
-        val assignments = root.optJSONArray("assignments").orEmpty().map { parseAssignment(it as JSONObject) }
+        val assignments = root.optJSONArray("assignments").orEmpty().map {
+            parseAssignment(it as JSONObject, resolveFile, stats)
+        }
         val timeBlocks = root.optJSONArray("timeBlocks").orEmpty().map { parseTimeBlock(it as JSONObject) }
         val history = root.optJSONArray("submissionHistory").orEmpty().map { parseHistory(it as JSONObject) }
-        return Document(subjects, assignments, timeBlocks, history)
+        return Document(subjects, assignments, timeBlocks, history, stats.skippedAttachments)
     }
 
     private fun parseSubject(obj: JSONObject) = SubjectRecord(
@@ -294,7 +318,12 @@ object JsonImporter {
         lastAssignmentRegisteredAt = nullableDate(obj.opt("lastAssignmentRegisteredAt"))
     )
 
-    private fun parseAssignment(obj: JSONObject): AssignmentRecord {
+    private fun parseAssignment(
+        obj: JSONObject,
+        resolveFile: ResolveFile,
+        stats: ParseStats
+    ): AssignmentRecord {
+        val assignmentRawId = rawId(obj)
         val rawStatus = obj.opt("status")
         val status = when (rawStatus) {
             is Number -> rawStatus.toInt()
@@ -302,7 +331,7 @@ object JsonImporter {
             else -> 0
         }
         return AssignmentRecord(
-            rawId = rawId(obj),
+            rawId = assignmentRawId,
             title = requiredString(obj, "title"),
             details = obj.optString("details", ""),
             dueDate = nullableDate(obj.opt("dueDate")),
@@ -326,20 +355,75 @@ object JsonImporter {
                     sortOrder = item.optInt("sortOrder", 0)
                 )
             },
-            attachments = obj.optJSONArray("attachments").orEmpty().map { attachment ->
-                val item = attachment as JSONObject
-                AttachmentRecord(
-                    rawId = rawId(item),
-                    fileName = requiredString(item, "fileName"),
-                    mimeType = item.optString("mimeType", "image/jpeg"),
-                    imageData = Base64.decode(
-                        requiredString(item, "imageData"),
-                        Base64.DEFAULT
-                    ),
-                    createdAt = dateOrNow(item.opt("createdAt"))
-                )
-            }
+            attachments = parseAttachments(obj, assignmentRawId, resolveFile, stats)
         )
+    }
+
+    /**
+     * 解析图片附件：优先使用 JSON 内的 Base64 数据；缺失或损坏时回退到 ZIP 的
+     * attachments/ 条目；两者都不可用则只跳过该附件，不让整份备份导入失败。
+     */
+    private fun parseAttachments(
+        obj: JSONObject,
+        assignmentRawId: String,
+        resolveFile: ResolveFile,
+        stats: ParseStats
+    ): List<AttachmentRecord> {
+        return obj.optJSONArray("attachments").orEmpty().mapNotNull { value ->
+            val item = value as? JSONObject
+            val attachmentRawId = item?.let { nullableRawId(it.opt("id")) }
+            if (item == null || attachmentRawId == null) {
+                stats.skippedAttachments++
+                return@mapNotNull null
+            }
+
+            val mimeType = item.optString("mimeType", "image/jpeg").ifBlank { "image/jpeg" }
+            val imageData = decodeImageData(
+                encoded = item.optString("imageData"),
+                assignmentRawId = assignmentRawId,
+                attachmentRawId = attachmentRawId,
+                resolveFile = resolveFile
+            )
+            if (imageData == null) {
+                stats.skippedAttachments++
+                return@mapNotNull null
+            }
+
+            AttachmentRecord(
+                rawId = attachmentRawId,
+                fileName = item.optString("fileName", "").ifBlank { "附件图片" },
+                mimeType = mimeType,
+                imageData = imageData,
+                createdAt = dateOrNow(item.opt("createdAt"))
+            )
+        }
+    }
+
+    private fun decodeImageData(
+        encoded: String,
+        assignmentRawId: String,
+        attachmentRawId: String,
+        resolveFile: ResolveFile
+    ): ByteArray? {
+        if (encoded.isNotBlank()) {
+            decodeBase64(encoded)?.let { return it }
+        }
+        // JSON 中没有可用图片时，按标识回退读取 ZIP 内的附件文件（跨端备份可能如此打包）。
+        return resolveFile(assignmentRawId, attachmentRawId)?.takeIf { it.isNotEmpty() }
+    }
+
+    /** Base64 解码：先严格解码，失败再按 MIME 规则忽略非法字符重试，仍失败返回 null。 */
+    private fun decodeBase64(value: String): ByteArray? {
+        val bytes = try {
+            Base64.getDecoder().decode(value)
+        } catch (_: IllegalArgumentException) {
+            try {
+                Base64.getMimeDecoder().decode(value)
+            } catch (_: IllegalArgumentException) {
+                return null
+            }
+        }
+        return bytes.takeIf { it.isNotEmpty() }
     }
 
     private fun parseTimeBlock(obj: JSONObject) = TimeBlockRecord(
@@ -360,7 +444,7 @@ object JsonImporter {
         lastUsedAt = dateOrNow(obj.opt("lastUsedAt"))
     )
 
-    private fun validate(document: Document) {
+    internal fun validate(document: Document) {
         requireUnique(document.subjects.map { it.rawId })
         requireUnique(document.assignments.map { it.rawId })
         requireUnique(document.timeBlocks.map { it.rawId })

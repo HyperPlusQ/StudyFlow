@@ -39,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.domain.AssignmentFilter
 import com.hyperplusq.studyflow.domain.AssignmentQueries
@@ -55,7 +56,8 @@ fun AssignmentsScreen(
     selectedSubjectId: Long?,
     onSelectSubject: (Long?) -> Unit,
     onOpen: (Long) -> Unit,
-    onEdit: (Long) -> Unit
+    onEdit: (Long) -> Unit,
+    bottomContentPadding: Dp = 0.dp
 ) {
     var filter by remember { mutableStateOf(AssignmentFilter()) }
     var scope by remember { mutableStateOf(ListScope.ALL) }
@@ -71,7 +73,7 @@ fun AssignmentsScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp)
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + bottomContentPadding)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(

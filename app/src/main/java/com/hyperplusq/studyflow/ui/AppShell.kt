@@ -5,11 +5,11 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -44,6 +44,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,9 +62,18 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.AssignmentEntity
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
 
 // 竖屏底栏与横屏侧边栏统一使用真正的胶囊圆角。
 private val PillShape = RoundedCornerShape(percent = 50)
+
+// 底栏高度较 1.6.1 增大，给图标更宽裕的垂直空间。
+private val BottomBarHeight = 64.dp
+
+// 图标距上下边框 = (64dp 栏高 − 48dp 图标) / 2 = 8dp，左右使用同一留白。
+private val BottomBarItemInset = 8.dp
 
 enum class AppTab(val title: String) {
     DASHBOARD("概览"),
@@ -110,91 +120,101 @@ fun StudyFlowAppUi(viewModel: AppViewModel) {
         timeBlockEditorOpen = true
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val compactPortrait = maxWidth < 600.dp && maxHeight >= maxWidth
-        // A compact, icon-only floating rail keeps more room for content in landscape.
-        val panelWidth = 88.dp
+    val imagePreviewState = remember { ImagePreviewState() }
+    // 底栏背景的高斯模糊来源：被捕获的内容区域。
+    val hazeState = remember { HazeState() }
 
-        if (compactPortrait) {
-            CompactLayout(
-                viewModel = viewModel,
+    CompositionLocalProvider(LocalImagePreviewState provides imagePreviewState) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val compactPortrait = maxWidth < 600.dp && maxHeight >= maxWidth
+            // A compact, icon-only floating rail keeps more room for content in landscape.
+            val panelWidth = 88.dp
+
+            if (compactPortrait) {
+                CompactLayout(
+                    viewModel = viewModel,
+                    state = state,
+                    tab = tab,
+                    onTab = { tab = it },
+                    selectedSubjectId = selectedSubjectId,
+                    onSelectSubject = { selectedSubjectId = it },
+                    message = message,
+                    hazeState = hazeState,
+                    onOpenAssignment = { detailAssignmentId = it },
+                    onEditAssignment = { openAssignment(it) },
+                    onNewAssignment = ::openNewAssignment,
+                    onEditTimeBlock = {
+                        editingTimeBlockId = it
+                        timeBlockEditorOpen = true
+                    },
+                    onNewTimeBlock = ::openNewTimeBlock
+                )
+            } else {
+                LargeLayout(
+                    viewModel = viewModel,
+                    state = state,
+                    tab = tab,
+                    onTab = { tab = it },
+                    selectedSubjectId = selectedSubjectId,
+                    onSelectSubject = { selectedSubjectId = it },
+                    message = message,
+                    panelWidth = panelWidth,
+                    onOpenAssignment = { detailAssignmentId = it },
+                    onEditAssignment = { openAssignment(it) },
+                    onNewAssignment = ::openNewAssignment,
+                    onEditTimeBlock = {
+                        editingTimeBlockId = it
+                        timeBlockEditorOpen = true
+                    },
+                    onNewTimeBlock = ::openNewTimeBlock
+                )
+            }
+        }
+
+        if (assignmentEditorOpen) {
+            AssignmentEditorDialog(
+                initial = editingAssignment,
                 state = state,
-                tab = tab,
-                onTab = { tab = it },
-                selectedSubjectId = selectedSubjectId,
-                onSelectSubject = { selectedSubjectId = it },
-                message = message,
-                onOpenAssignment = { detailAssignmentId = it },
-                onEditAssignment = { openAssignment(it) },
-                onNewAssignment = ::openNewAssignment,
-                onEditTimeBlock = {
-                    editingTimeBlockId = it
-                    timeBlockEditorOpen = true
-                },
-                onNewTimeBlock = ::openNewTimeBlock
-            )
-        } else {
-            LargeLayout(
-                viewModel = viewModel,
-                state = state,
-                tab = tab,
-                onTab = { tab = it },
-                selectedSubjectId = selectedSubjectId,
-                onSelectSubject = { selectedSubjectId = it },
-                message = message,
-                panelWidth = panelWidth,
-                onOpenAssignment = { detailAssignmentId = it },
-                onEditAssignment = { openAssignment(it) },
-                onNewAssignment = ::openNewAssignment,
-                onEditTimeBlock = {
-                    editingTimeBlockId = it
-                    timeBlockEditorOpen = true
-                },
-                onNewTimeBlock = ::openNewTimeBlock
+                onDismiss = { assignmentEditorOpen = false },
+                onSave = { assignment: AssignmentEntity, attachments ->
+                    viewModel.saveAssignment(assignment, attachments)
+                    assignmentEditorOpen = false
+                }
             )
         }
-    }
 
-    if (assignmentEditorOpen) {
-        AssignmentEditorDialog(
-            initial = editingAssignment,
-            state = state,
-            onDismiss = { assignmentEditorOpen = false },
-            onSave = { assignment: AssignmentEntity, attachments ->
-                viewModel.saveAssignment(assignment, attachments)
-                assignmentEditorOpen = false
-            }
-        )
-    }
+        detailAssignment?.let { item ->
+            AssignmentDetailDialog(
+                item = item,
+                state = state,
+                onDismiss = { detailAssignmentId = null },
+                onEdit = {
+                    detailAssignmentId = null
+                    openAssignment(item.assignment.id)
+                },
+                onDelete = { viewModel.deleteAssignment(item.assignment.id) },
+                onToggleComplete = { viewModel.setAssignmentCompleted(item.assignment.id, it) },
+                onSaveSubtask = { viewModel.saveSubtask(it) },
+                onDeleteSubtask = { viewModel.deleteSubtask(it) },
+                onToggleSubtask = { subtask, completed ->
+                    viewModel.setSubtaskCompleted(subtask.id, completed)
+                },
+                onCancelCalendarSync = { viewModel.cancelCalendarSync(item.assignment.id) }
+            )
+        }
 
-    detailAssignment?.let { item ->
-        AssignmentDetailDialog(
-            item = item,
-            state = state,
-            onDismiss = { detailAssignmentId = null },
-            onEdit = {
-                detailAssignmentId = null
-                openAssignment(item.assignment.id)
-            },
-            onDelete = { viewModel.deleteAssignment(item.assignment.id) },
-            onToggleComplete = { viewModel.setAssignmentCompleted(item.assignment.id, it) },
-            onSaveSubtask = { viewModel.saveSubtask(it) },
-            onDeleteSubtask = { viewModel.deleteSubtask(it) },
-            onToggleSubtask = { subtask, completed ->
-                viewModel.setSubtaskCompleted(subtask.id, completed)
-            },
-            onCancelCalendarSync = { viewModel.cancelCalendarSync(item.assignment.id) }
-        )
-    }
+        if (timeBlockEditorOpen) {
+            TimeBlockEditorDialog(
+                initial = editingTimeBlock,
+                state = state,
+                onDismiss = { timeBlockEditorOpen = false },
+                onSave = { viewModel.saveTimeBlock(it) },
+                onDelete = { viewModel.deleteTimeBlock(it) }
+            )
+        }
 
-    if (timeBlockEditorOpen) {
-        TimeBlockEditorDialog(
-            initial = editingTimeBlock,
-            state = state,
-            onDismiss = { timeBlockEditorOpen = false },
-            onSave = { viewModel.saveTimeBlock(it) },
-            onDelete = { viewModel.deleteTimeBlock(it) }
-        )
+        // 全屏图片预览：独立窗口，覆盖列表与各弹窗。
+        ImagePreviewOverlay(imagePreviewState)
     }
 }
 
@@ -208,6 +228,7 @@ private fun CompactLayout(
     selectedSubjectId: Long?,
     onSelectSubject: (Long?) -> Unit,
     message: String?,
+    hazeState: HazeState,
     onOpenAssignment: (Long) -> Unit,
     onEditAssignment: (Long) -> Unit,
     onNewAssignment: () -> Unit,
@@ -218,28 +239,47 @@ private fun CompactLayout(
         containerColor = Color.Transparent,
         bottomBar = {
             Column(Modifier.fillMaxWidth()) {
-                Surface(
-                    shape = PillShape,
-                    // 与页面内容保持相同的 20dp 水平边距，并使用更深一级的容器色。
-                    color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                    tonalElevation = 0.dp,
-                    modifier = Modifier
+                // 较 1.6.1 收窄宽度，并用 haze 对栏后内容做高斯模糊 + 半透明底色。
+                val hazeBackground = MaterialTheme.colorScheme.background
+                val barTint = MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.72f)
+                Box(
+                    Modifier
                         .fillMaxWidth()
-                        .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)
+                        .padding(start = 28.dp, end = 28.dp, bottom = 12.dp)
+                        .clip(PillShape)
+                        .hazeEffect(hazeState) {
+                            // haze 必须有底色，否则绘制阶段直接抛异常。
+                            backgroundColor = hazeBackground
+                            blurRadius = 26.dp
+                            noiseFactor = 0f
+                        }
+                        .background(barTint)
                 ) {
                     NavigationBar(
                         containerColor = Color.Transparent,
                         tonalElevation = 0.dp,
                         windowInsets = WindowInsets(0.dp),
-                        modifier = Modifier.height(56.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(BottomBarHeight)
                     ) {
-                        AppTab.entries.forEach { item ->
-                            BottomNavigationItem(
-                                selected = tab == item,
-                                onClick = { onTab(item) },
-                                icon = tabIcon(item),
-                                contentDescription = item.title
-                            )
+                        // 图标两端对齐，左右留白与上下一致（各 8dp），中间间距由屏宽均分。
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .height(BottomBarHeight)
+                                .padding(horizontal = BottomBarItemInset),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            AppTab.entries.forEach { item ->
+                                BottomNavigationItem(
+                                    selected = tab == item,
+                                    onClick = { onTab(item) },
+                                    icon = tabIcon(item),
+                                    contentDescription = item.title
+                                )
+                            }
                         }
                     }
                 }
@@ -268,9 +308,11 @@ private fun CompactLayout(
             tab = tab,
             selectedSubjectId = selectedSubjectId,
             onSelectSubject = onSelectSubject,
-            // Only reserve top inset; content continues behind the floating bar.
+            // 顶部保留安全区；内容从底栏后方穿过，滚动末尾停在底栏上方。
             modifier = Modifier.padding(top = padding.calculateTopPadding()),
             message = message,
+            bottomContentPadding = padding.calculateBottomPadding(),
+            hazeState = hazeState,
             onOpenAssignment = onOpenAssignment,
             onEditAssignment = onEditAssignment,
             onEditTimeBlock = onEditTimeBlock
@@ -279,7 +321,7 @@ private fun CompactLayout(
 }
 
 @Composable
-private fun RowScope.BottomNavigationItem(
+private fun BottomNavigationItem(
     selected: Boolean,
     onClick: () -> Unit,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
@@ -290,43 +332,36 @@ private fun RowScope.BottomNavigationItem(
 
     Box(
         modifier = Modifier
-            .weight(1f)
-            .height(56.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        Box(
-            modifier = Modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(
-                    when {
-                        selected -> MaterialTheme.colorScheme.primaryContainer
-                        pressed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
-                        else -> Color.Transparent
-                    }
-                )
-                .clickable(
-                    interactionSource = interactionSource,
-                    indication = null,
-                    role = Role.Tab,
-                    onClick = onClick
-                )
-                .semantics {
-                    this.contentDescription = contentDescription
-                    this.selected = selected
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = if (selected) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(
+                when {
+                    selected -> MaterialTheme.colorScheme.primaryContainer
+                    pressed -> MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+                    else -> Color.Transparent
                 }
             )
-        }
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                role = Role.Tab,
+                onClick = onClick
+            )
+            .semantics {
+                this.contentDescription = contentDescription
+                this.selected = selected
+            },
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = if (selected) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
     }
 }
 
@@ -573,33 +608,42 @@ private fun AppContent(
     onSelectSubject: (Long?) -> Unit,
     modifier: Modifier = Modifier,
     message: String?,
+    bottomContentPadding: Dp = 0.dp,
+    hazeState: HazeState? = null,
     onOpenAssignment: (Long) -> Unit,
     onEditAssignment: (Long) -> Unit,
     onEditTimeBlock: (Long) -> Unit
 ) {
-    Box(modifier.fillMaxSize()) {
+    Box(
+        modifier
+            .fillMaxSize()
+            // 底栏高斯模糊采样这片内容；无底栏的大屏布局不附加该层。
+            .then(if (hazeState != null) Modifier.hazeSource(hazeState) else Modifier)
+    ) {
         AnimatedContent(
             targetState = tab,
             transitionSpec = { fadeIn() togetherWith fadeOut() },
             label = "tab"
         ) { target ->
             when (target) {
-                AppTab.DASHBOARD -> DashboardScreen(state)
+                AppTab.DASHBOARD -> DashboardScreen(state, bottomContentPadding)
                 AppTab.ASSIGNMENTS -> AssignmentsScreen(
                     viewModel = viewModel,
                     state = state,
                     selectedSubjectId = selectedSubjectId,
                     onSelectSubject = onSelectSubject,
                     onOpen = onOpenAssignment,
-                    onEdit = onEditAssignment
+                    onEdit = onEditAssignment,
+                    bottomContentPadding = bottomContentPadding
                 )
                 AppTab.SCHEDULE -> ScheduleScreen(
                     viewModel = viewModel,
                     state = state,
-                    onEdit = onEditTimeBlock
+                    onEdit = onEditTimeBlock,
+                    bottomContentPadding = bottomContentPadding
                 )
-                AppTab.SUBJECTS -> SubjectsScreen(viewModel, state)
-                AppTab.SETTINGS -> SettingsScreen(viewModel, state)
+                AppTab.SUBJECTS -> SubjectsScreen(viewModel, state, bottomContentPadding)
+                AppTab.SETTINGS -> SettingsScreen(viewModel, state, bottomContentPadding)
             }
         }
 
@@ -607,7 +651,11 @@ private fun AppContent(
             Surface(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 92.dp, start = 24.dp, end = 24.dp),
+                    .padding(
+                        bottom = bottomContentPadding + 12.dp,
+                        start = 24.dp,
+                        end = 24.dp
+                    ),
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.inverseSurface,
                 shadowElevation = 8.dp

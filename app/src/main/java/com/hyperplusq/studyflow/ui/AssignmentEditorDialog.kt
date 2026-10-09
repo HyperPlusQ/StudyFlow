@@ -1,11 +1,11 @@
 package com.hyperplusq.studyflow.ui
 
 import android.app.DatePickerDialog
-import android.graphics.BitmapFactory
 import android.provider.OpenableColumns
 import android.app.TimePickerDialog
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -373,23 +373,29 @@ private fun AttachmentThumbnail(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val bitmap = remember(attachment.imageData) {
-        BitmapFactory.decodeByteArray(
-            attachment.imageData,
-            0,
-            attachment.imageData.size
-        )?.asImageBitmap()
-    }
-    Box(modifier.clip(MaterialTheme.shapes.large)) {
-        if (bitmap != null) {
-            Image(
-                bitmap = bitmap,
+    val openPreview = rememberImagePreviewLauncher()
+    val state by rememberAttachmentThumbnail(attachment)
+    Box(
+        modifier
+            .clip(MaterialTheme.shapes.large)
+            .clickable { openPreview(attachment) }
+    ) {
+        when (val current = state) {
+            DecodedImage.Loading -> Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(84.dp)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+            )
+
+            is DecodedImage.Ready -> Image(
+                bitmap = current.bitmap.asImageBitmap(),
                 contentDescription = attachment.fileName,
                 modifier = Modifier.fillMaxWidth().height(84.dp),
                 contentScale = androidx.compose.ui.layout.ContentScale.Crop
             )
-        } else {
-            androidx.compose.foundation.layout.Box(
+
+            DecodedImage.Failed -> Box(
                 Modifier
                     .fillMaxWidth()
                     .height(84.dp)

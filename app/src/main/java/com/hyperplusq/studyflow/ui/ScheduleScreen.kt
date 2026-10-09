@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.data.db.TimeBlockEntity
 import com.hyperplusq.studyflow.domain.DateUtils
@@ -37,7 +38,8 @@ import java.time.ZoneId
 fun ScheduleScreen(
     viewModel: AppViewModel,
     state: AppUiState,
-    onEdit: (Long) -> Unit
+    onEdit: (Long) -> Unit,
+    bottomContentPadding: Dp = 0.dp
 ) {
     val grouped = state.timeBlocks.groupBy {
         DateUtils.localDate(it.startDate)?.atStartOfDay(ZoneId.systemDefault())?.toInstant()?.toEpochMilli()
@@ -48,7 +50,7 @@ fun ScheduleScreen(
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("学习日程", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)

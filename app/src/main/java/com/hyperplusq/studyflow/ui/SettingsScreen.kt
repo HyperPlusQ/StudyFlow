@@ -44,11 +44,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.hyperplusq.studyflow.BuildConfig
 
 @Composable
-fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
+fun SettingsScreen(
+    viewModel: AppViewModel,
+    state: AppUiState,
+    bottomContentPadding: Dp = 0.dp
+) {
     val context = LocalContext.current
     var checking by remember { mutableStateOf(false) }
     val exporting by viewModel.exporting.collectAsState()
@@ -81,7 +86,7 @@ fun SettingsScreen(viewModel: AppViewModel, state: AppUiState) {
         Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
+            .padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 16.dp + bottomContentPadding),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text("设置", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)

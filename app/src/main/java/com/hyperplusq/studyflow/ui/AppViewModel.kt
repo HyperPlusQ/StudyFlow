@@ -272,10 +272,18 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 refreshSubjectReminders(settings.notificationsEnabled)
                 WidgetUpdater.requestUpdate(getApplication())
                 announce(
-                    "导入完成：${summary.assignments} 份作业、${summary.attachments} 个附件"
+                    "导入完成：${summary.assignments} 份作业、${summary.attachments} 个附件" +
+                        if (summary.skippedAttachments > 0) {
+                            "，已跳过 ${summary.skippedAttachments} 个无法恢复的图片附件"
+                        } else {
+                            ""
+                        }
                 )
             } catch (c: CancellationException) {
                 throw c
+            } catch (e: OutOfMemoryError) {
+                // 备份体积过大时给出提示，而不是让应用闪退。
+                announce("导入失败：内存不足，备份文件过大")
             } catch (e: Exception) {
                 announce("导入失败：${e.message ?: "未知错误"}")
             } finally {
@@ -294,6 +302,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 announce("ZIP 备份已导出")
             } catch (c: CancellationException) {
                 throw c
+            } catch (e: OutOfMemoryError) {
+                // 附件较多时导出会整体占用较多内存，优先提示而不是闪退。
+                announce("导出失败：内存不足，图片附件过多，请分批导出")
             } catch (e: Exception) {
                 announce("导出失败：${e.message ?: "未知错误"}")
             } finally {
