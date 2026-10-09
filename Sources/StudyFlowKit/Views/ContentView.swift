@@ -33,7 +33,8 @@ struct ContentView: View {
         iosTabView
         .background { StudyFlowBackdrop().ignoresSafeArea() }
         .task {
-            syncCoordinator.performLaunchSyncIfNeeded(context: context)
+            // 同步的重活在后台，但也不必串行阻塞后面的提醒注册。
+            Task { await syncCoordinator.performLaunchSyncIfNeeded(context: context) }
             await NotificationManager.shared.requestAuthorization()
             NotificationManager.scheduleAllSubjectReminders(
                 subjects: subjects,
@@ -43,7 +44,7 @@ struct ContentView: View {
         .onReceive(
             Timer.publish(every: 30, on: .main, in: .common).autoconnect()
         ) { _ in
-            syncCoordinator.checkScheduledSyncIfNeeded(context: context)
+            Task { await syncCoordinator.checkScheduledSyncIfNeeded(context: context) }
         }
         .onReceive(NotificationCenter.default.publisher(for: .studyFlowNewAssignment)) { _ in
             showNewAssignment = true
@@ -312,7 +313,7 @@ struct SettingsView: View {
                     .frame(maxWidth: .infinity)
 
                     Button {
-                        syncCoordinator.synchronize(context: context)
+                        Task { await syncCoordinator.synchronize(context: context) }
                     } label: {
                         Label("立即同步", systemImage: "arrow.triangle.2.circlepath.icloud")
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -534,6 +535,8 @@ struct SettingsView: View {
         do {
             let data = try Data(contentsOf: url)
             try DataExportService.restore(data: data, into: context)
+            // 导入同样是一次数据变更：刷新同步比较时间戳，下次同步才会上传。
+            syncCoordinator.refreshLocalSnapshotIfNeeded(context: context)
             exportNotice = "导入成功。当前数据已替换为文件内容。"
         } catch {
             exportNotice = "导入失败：\(error.localizedDescription)"

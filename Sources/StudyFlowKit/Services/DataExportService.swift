@@ -84,27 +84,26 @@ enum DataExportService {
     }
 
     /// 将当前数据库编码为完整的 ZIP 备份。
-    @MainActor
     static func currentData(context: ModelContext) throws -> Data {
         try makeBackup(context: context)
     }
 
     /// 普通导出与 iCloud 同步共用的 ZIP 备份核心。
-    @MainActor
     static func makeBackup(context: ModelContext) throws -> Data {
         try makeBackup(
             subjects: try context.fetch(FetchDescriptor<Subject>()),
             assignments: try context.fetch(FetchDescriptor<Assignment>()),
+            attachments: try context.fetch(FetchDescriptor<ImageAttachment>()),
             timeBlocks: try context.fetch(FetchDescriptor<TimeBlock>()),
             submissionHistory: try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
         )
     }
 
     /// 从已经取得的数据集合生成 ZIP，避免导出和同步各自维护不同实现。
-    @MainActor
     static func makeBackup(
         subjects: [Subject],
         assignments: [Assignment],
+        attachments: [ImageAttachment],
         timeBlocks: [TimeBlock],
         submissionHistory: [SubmissionHistoryEntry]
     ) throws -> Data {
@@ -112,24 +111,58 @@ enum DataExportService {
             json: try encodedDocument(
                 subjects: subjects,
                 assignments: assignments,
+                attachments: attachments,
                 timeBlocks: timeBlocks,
                 submissionHistory: submissionHistory
             ),
-            assignments: assignments
+            attachments: attachments
         )
     }
 
-    /// 用当前数据库刷新同步文件，并显式写入用于新旧比较的时间戳。
-    @discardableResult
-    @MainActor
-    static func writeCurrentBackup(
+    /// 把当前数据库打包并直接写入文件：ZIP 流式落盘，不在内存里再复制一份归档。
+    /// 附件很多时可明显降低同步与首次建立镜像的峰值内存。
+    static func writeArchive(
         context: ModelContext,
         to url: URL,
-        modificationDate: Date? = nil
-    ) throws -> Data {
-        let data = try makeBackup(context: context)
-        try write(data, to: url, modificationDate: modificationDate)
-        return data
+        modificationDate: Date?
+    ) throws {
+        let attachments = try context.fetch(FetchDescriptor<ImageAttachment>())
+        let json = try encodedDocument(
+            subjects: try context.fetch(FetchDescriptor<Subject>()),
+            assignments: try context.fetch(FetchDescriptor<Assignment>()),
+            attachments: attachments,
+            timeBlocks: try context.fetch(FetchDescriptor<TimeBlock>()),
+            submissionHistory: try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
+        )
+
+        var entries = [BackupArchive.Entry(path: "studyflow.json", data: json)]
+        entries += attachmentEntries(from: attachments)
+        try BackupArchive.write(entries: entries, to: url)
+
+        if let modificationDate {
+            try FileManager.default.setAttributes(
+                [.modificationDate: modificationDate],
+                ofItemAtPath: url.path
+            )
+        }
+    }
+
+    /// 附件在 ZIP 中的原始图片条目；与 studyflow.json 内嵌的 Base64 互为备份。
+    private static func attachmentEntries(from attachments: [ImageAttachment]) -> [BackupArchive.Entry] {
+        attachments
+            .sorted { $0.createdAt < $1.createdAt }
+            .compactMap { attachment in
+                attachment.assignment.map { assignment in
+                    BackupArchive.Entry(
+                        path: BackupArchive.path(
+                            forAttachment: attachment.id,
+                            assignmentID: assignment.id,
+                            mimeType: attachment.mimeType
+                        ),
+                        data: attachment.imageData
+                    )
+                }
+            }
     }
 
     /// 完整校验 JSON 快照后再恢复到当前数据库。
@@ -150,6 +183,8 @@ enum DataExportService {
         }
 
         ((try? context.fetch(FetchDescriptor<TimeBlock>())) ?? []).forEach { context.delete($0) }
+        // 先清理旧附件，避免云盘恢复时同一 UUID 的图片在一次事务中冲突。
+        ((try? context.fetch(FetchDescriptor<ImageAttachment>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<Subject>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<SubmissionHistoryEntry>())) ?? []).forEach { context.delete($0) }
@@ -198,7 +233,7 @@ enum DataExportService {
                         assignment: assignment
                     )
                 }
-            assignment.attachments = (record.attachments ?? [])
+            let restoredAttachments = (record.attachments ?? [])
                 .sorted { $0.createdAt < $1.createdAt }
                 .map {
                     ImageAttachment(
@@ -210,7 +245,10 @@ enum DataExportService {
                         assignment: assignment
                     )
                 }
+            assignment.attachments = restoredAttachments
             context.insert(assignment)
+            // 显式插入附件，确保恢复后的图片关系被完整写入同步快照。
+            restoredAttachments.forEach(context.insert)
         }
 
         document.timeBlocks.forEach { record in
@@ -281,93 +319,111 @@ enum DataExportService {
     private static func encodedDocument(
         subjects: [Subject],
         assignments: [Assignment],
+        attachments: [ImageAttachment],
         timeBlocks: [TimeBlock],
         submissionHistory: [SubmissionHistoryEntry]
     ) throws -> Data {
+        // 先转换为独立记录，避免复杂嵌套闭包让 Swift 类型推断超时。
+        let subjectRecords: [SubjectRecord] = subjects
+            .sorted { ($0.sortOrder, $0.id.uuidString) < ($1.sortOrder, $1.id.uuidString) }
+            .map { subject in
+                SubjectRecord(
+                    id: subject.id,
+                    name: subject.name,
+                    symbol: subject.symbol,
+                    colorHex: subject.colorHex,
+                    parentId: subject.parentId,
+                    sortOrder: subject.sortOrder,
+                    createdAt: subject.createdAt,
+                    assignmentIntervalDays: subject.assignmentIntervalDays,
+                    lastAssignmentRegisteredAt: subject.lastAssignmentRegisteredAt
+                )
+            }
+
+        var attachmentRecordsByAssignment: [UUID: [AttachmentRecord]] = [:]
+        for attachment in attachments {
+            guard let assignmentID = attachment.assignment?.id else { continue }
+            let record = AttachmentRecord(
+                id: attachment.id,
+                fileName: attachment.fileName,
+                mimeType: attachment.mimeType,
+                imageData: attachment.imageData,
+                createdAt: attachment.createdAt
+            )
+            attachmentRecordsByAssignment[assignmentID, default: []].append(record)
+        }
+        for assignmentID in attachmentRecordsByAssignment.keys {
+            attachmentRecordsByAssignment[assignmentID]?.sort { $0.createdAt < $1.createdAt }
+        }
+
+        let assignmentRecords: [AssignmentRecord] = assignments
+            .sorted { $0.createdAt < $1.createdAt }
+            .map { assignment in
+                let subtaskRecords: [SubtaskRecord] = assignment.subtasks
+                    .sorted { $0.sortOrder < $1.sortOrder }
+                    .map { subtask in
+                        SubtaskRecord(
+                            id: subtask.id,
+                            title: subtask.title,
+                            isCompleted: subtask.isCompleted,
+                            sortOrder: subtask.sortOrder
+                        )
+                    }
+
+                return AssignmentRecord(
+                    id: assignment.id,
+                    title: assignment.title,
+                    details: assignment.details,
+                    dueDate: assignment.dueDate,
+                    submissionMethod: assignment.submissionMethod,
+                    subjectId: assignment.subjectId,
+                    priority: assignment.priorityRaw,
+                    status: assignment.statusRaw,
+                    weight: assignment.weight,
+                    reminderLeadHours: assignment.reminderLeadHours,
+                    createdAt: assignment.createdAt,
+                    updatedAt: assignment.updatedAt,
+                    completedAt: assignment.completedAt,
+                    calendarEventIdentifier: assignment.calendarEventIdentifier,
+                    subtasks: subtaskRecords,
+                    attachments: attachmentRecordsByAssignment[assignment.id] ?? []
+                )
+            }
+
+        let timeBlockRecords: [TimeBlockRecord] = timeBlocks
+            .sorted { $0.startDate < $1.startDate }
+            .map { block in
+                TimeBlockRecord(
+                    id: block.id,
+                    title: block.title,
+                    assignmentId: block.assignmentId,
+                    subjectId: block.subjectId,
+                    startDate: block.startDate,
+                    durationMinutes: block.durationMinutes,
+                    notes: block.notes,
+                    createdAt: block.createdAt
+                )
+            }
+
+        let submissionHistoryRecords: [SubmissionHistoryRecord] = submissionHistory
+            .sorted { $0.lastUsedAt > $1.lastUsedAt }
+            .map { entry in
+                SubmissionHistoryRecord(
+                    id: entry.id,
+                    subjectId: entry.subjectId,
+                    value: entry.value,
+                    lastUsedAt: entry.lastUsedAt
+                )
+            }
+
         let document = ExportDocument(
             format: "StudyFlow",
             formatVersion: 1,
             exportedAt: .now,
-            subjects: subjects
-                .sorted { ($0.sortOrder, $0.id.uuidString) < ($1.sortOrder, $1.id.uuidString) }
-                .map {
-                    SubjectRecord(
-                        id: $0.id,
-                        name: $0.name,
-                        symbol: $0.symbol,
-                        colorHex: $0.colorHex,
-                        parentId: $0.parentId,
-                        sortOrder: $0.sortOrder,
-                        createdAt: $0.createdAt,
-                        assignmentIntervalDays: $0.assignmentIntervalDays,
-                        lastAssignmentRegisteredAt: $0.lastAssignmentRegisteredAt
-                    )
-                },
-            assignments: assignments
-                .sorted { $0.createdAt < $1.createdAt }
-                .map {
-                    AssignmentRecord(
-                        id: $0.id,
-                        title: $0.title,
-                        details: $0.details,
-                        dueDate: $0.dueDate,
-                        submissionMethod: $0.submissionMethod,
-                        subjectId: $0.subjectId,
-                        priority: $0.priorityRaw,
-                        status: $0.statusRaw,
-                        weight: $0.weight,
-                        reminderLeadHours: $0.reminderLeadHours,
-                        createdAt: $0.createdAt,
-                        updatedAt: $0.updatedAt,
-                        completedAt: $0.completedAt,
-                        calendarEventIdentifier: $0.calendarEventIdentifier,
-                        subtasks: $0.subtasks
-                            .sorted { $0.sortOrder < $1.sortOrder }
-                            .map {
-                                SubtaskRecord(
-                                    id: $0.id,
-                                    title: $0.title,
-                                    isCompleted: $0.isCompleted,
-                                    sortOrder: $0.sortOrder
-                                )
-                            },
-                        attachments: $0.attachments
-                            .sorted { $0.createdAt < $1.createdAt }
-                            .map {
-                                AttachmentRecord(
-                                    id: $0.id,
-                                    fileName: $0.fileName,
-                                    mimeType: $0.mimeType,
-                                    imageData: $0.imageData,
-                                    createdAt: $0.createdAt
-                                )
-                            }
-                    )
-                },
-            timeBlocks: timeBlocks
-                .sorted { $0.startDate < $1.startDate }
-                .map {
-                    TimeBlockRecord(
-                        id: $0.id,
-                        title: $0.title,
-                        assignmentId: $0.assignmentId,
-                        subjectId: $0.subjectId,
-                        startDate: $0.startDate,
-                        durationMinutes: $0.durationMinutes,
-                        notes: $0.notes,
-                        createdAt: $0.createdAt
-                    )
-                },
-            submissionHistory: submissionHistory
-                .sorted { $0.lastUsedAt > $1.lastUsedAt }
-                .map {
-                    SubmissionHistoryRecord(
-                        id: $0.id,
-                        subjectId: $0.subjectId,
-                        value: $0.value,
-                        lastUsedAt: $0.lastUsedAt
-                    )
-                }
+            subjects: subjectRecords,
+            assignments: assignmentRecords,
+            timeBlocks: timeBlockRecords,
+            submissionHistory: submissionHistoryRecords
         )
 
         let encoder = JSONEncoder()
@@ -429,24 +485,9 @@ enum DataExportService {
     }
 
 
-    private static func archive(json: Data, assignments: [Assignment]) throws -> Data {
+    private static func archive(json: Data, attachments: [ImageAttachment]) throws -> Data {
         var entries = [BackupArchive.Entry(path: "studyflow.json", data: json)]
-        entries += assignments
-            .sorted { $0.createdAt < $1.createdAt }
-            .flatMap { assignment in
-                assignment.attachments
-                    .sorted { $0.createdAt < $1.createdAt }
-                    .map { attachment in
-                        BackupArchive.Entry(
-                            path: BackupArchive.path(
-                                forAttachment: attachment.id,
-                                assignmentID: assignment.id,
-                                mimeType: attachment.mimeType
-                            ),
-                            data: attachment.imageData
-                        )
-                    }
-            }
+        entries += attachmentEntries(from: attachments)
         return try BackupArchive.create(entries: entries)
     }
 

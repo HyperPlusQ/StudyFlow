@@ -95,8 +95,16 @@ struct DashboardView: View {
         }
     }
 
+    /// 较小的统计卡片固定按双排（每行两张）显示。
+    private var statsColumns: [GridItem] {
+        [
+            GridItem(.flexible(), spacing: 16),
+            GridItem(.flexible(), spacing: 16)
+        ]
+    }
+
     private var statsGrid: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 210), spacing: 16)], spacing: 16) {
+        LazyVGrid(columns: statsColumns, spacing: 16) {
             StatCard(
                 title: "进行中",
                 value: "\(active.count)",

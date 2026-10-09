@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftData
 import SwiftUI
 import UIKit
@@ -14,6 +15,7 @@ struct AssignmentDetailView: View {
     @State private var notice: String?
     @State private var confirmDelete = false
     @State private var isSyncing = false
+    @State private var previewedAttachmentID: UUID?
 
     private var subject: Subject? {
         assignment.subjectId.flatMap { id in subjects.first { $0.id == id } }
@@ -47,6 +49,19 @@ struct AssignmentDetailView: View {
             .padding(22)
         }
         .background(.thinMaterial)
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { previewedAttachmentID != nil },
+                set: { if !$0 { previewedAttachmentID = nil } }
+            )
+        ) {
+            if let attachment = assignment.attachments.first(where: { $0.id == previewedAttachmentID }) {
+                AttachmentPreviewView(
+                    attachment: attachment,
+                    onDismiss: { previewedAttachmentID = nil }
+                )
+            }
+        }
         .alert("同步日历", isPresented: Binding(
             get: { notice != nil },
             set: { if !$0 { notice = nil } }
@@ -143,35 +158,23 @@ struct AssignmentDetailView: View {
                     .font(.callout)
                     .foregroundStyle(.tertiary)
             } else {
-                LazyVGrid(
-                    columns: Array(
-                        repeating: GridItem(.flexible(), spacing: 12),
-                        count: 3
-                    ),
-                    spacing: 12
-                ) {
-                    ForEach(assignment.attachments.sorted { $0.createdAt < $1.createdAt }, id: \.id) { attachment in
-                        if let image = UIImage(data: attachment.imageData) {
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(height: 150)
-                                .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(Color.primary.opacity(0.08))
-                                }
-                                .accessibilityLabel("附件：\(attachment.fileName)")
-                        } else {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.secondary.opacity(0.12))
-                                .frame(height: 150)
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .accessibilityLabel("无法预览附件：\(attachment.fileName)")
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 12) {
+                        ForEach(assignment.attachments.sorted { $0.createdAt < $1.createdAt }, id: \.id) { attachment in
+                            Button {
+                                previewedAttachmentID = attachment.id
+                            } label: {
+                                AttachmentThumbnailImage(attachment: attachment)
+                                    .frame(width: 180, height: 150)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .strokeBorder(Color.primary.opacity(0.08))
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("全屏查看附件：\(attachment.fileName)")
                         }
                     }
                 }
@@ -397,6 +400,95 @@ struct AssignmentDetailView: View {
             PersistentStore.save(context)
         } catch {
             notice = error.localizedDescription
+        }
+    }
+}
+
+/// 全屏图片预览：QuickLook 内容加右上角关闭按钮，保证总能退出预览。
+struct AttachmentPreviewView: View {
+    let attachment: ImageAttachment
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            SystemAttachmentViewer(attachment: attachment, onDismiss: onDismiss)
+
+            closeButton
+        }
+        .background {
+            Color.black.ignoresSafeArea()
+        }
+    }
+
+    private var closeButton: some View {
+        Button(action: onDismiss) {
+            Image(systemName: "xmark")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .frame(width: 38, height: 38)
+                .background(.ultraThinMaterial, in: Circle())
+                .overlay {
+                    Circle().strokeBorder(Color.white.opacity(0.22))
+                }
+                .contentShape(Circle())
+        }
+        .padding(.top, 8)
+        .padding(.trailing, 16)
+        .accessibilityLabel("关闭图片预览")
+    }
+}
+
+/// 使用系统 QuickLook 查看单张图片附件，保留系统缩放能力。
+struct SystemAttachmentViewer: UIViewControllerRepresentable {
+    let attachment: ImageAttachment
+    let onDismiss: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(attachment: attachment, onDismiss: onDismiss)
+    }
+
+    func makeUIViewController(context: Context) -> QLPreviewController {
+        let controller = QLPreviewController()
+        controller.dataSource = context.coordinator
+        controller.delegate = context.coordinator
+        return controller
+    }
+
+    func updateUIViewController(_ controller: QLPreviewController, context: Context) {
+        context.coordinator.onDismiss = onDismiss
+    }
+
+    @preconcurrency
+    final class Coordinator: NSObject, QLPreviewControllerDataSource, @preconcurrency QLPreviewControllerDelegate {
+        private let previewURL: URL
+        var onDismiss: () -> Void
+
+        init(attachment: ImageAttachment, onDismiss: @escaping () -> Void) {
+            self.onDismiss = onDismiss
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("StudyFlowAttachmentPreviews", isDirectory: true)
+            try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            let fileExtension = BackupArchive.fileExtension(for: attachment.mimeType)
+            previewURL = directory
+                .appendingPathComponent("\(attachment.id.uuidString).\(fileExtension)")
+            try? attachment.imageData.write(to: previewURL, options: .atomic)
+            super.init()
+        }
+
+        deinit {
+            try? FileManager.default.removeItem(at: previewURL)
+        }
+
+        func numberOfPreviewItems(in controller: QLPreviewController) -> Int {
+            1
+        }
+
+        func previewController(_ controller: QLPreviewController, previewItemAt index: Int) -> QLPreviewItem {
+            previewURL as NSURL
+        }
+
+        func previewControllerWillDismiss(_ controller: QLPreviewController) {
+            onDismiss()
         }
     }
 }

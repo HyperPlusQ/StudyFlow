@@ -14,7 +14,7 @@ struct AssignmentListView: View {
     @State private var selectedAssignmentId: UUID?
     @State private var editingAssignment: Assignment?
     @State private var schedulingAssignment: Assignment?
-    @State private var showFilters = false
+    @State private var previewedAttachmentID: UUID?
 
     private var subjectMap: [UUID: Subject] {
         Dictionary(uniqueKeysWithValues: subjects.map { ($0.id, $0) })
@@ -79,22 +79,53 @@ struct AssignmentListView: View {
                 assignmentList
             }
         }
+        .fullScreenCover(
+            isPresented: Binding(
+                get: { previewedAttachmentID != nil },
+                set: { if !$0 { previewedAttachmentID = nil } }
+            )
+        ) {
+            if let attachment = assignments.lazy.flatMap(\.attachments).first(where: { $0.id == previewedAttachmentID }) {
+                AttachmentPreviewView(
+                    attachment: attachment,
+                    onDismiss: { previewedAttachmentID = nil }
+                )
+            }
+        }
         .navigationTitle(scope.subjectId.map { subjectMap[$0]?.name ?? scope.scope.title } ?? scope.scope.title)
         .searchable(text: $filter.searchText, placement: .toolbar, prompt: "搜索标题、内容、提交方式或子任务")
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button { showFilters.toggle() } label: {
+                // 类比相册的筛选按钮：非全屏、锚定在按钮下方的弹出式菜单。
+                Menu {
+                    Picker("截止日期", selection: $filter.dueWindow) {
+                        ForEach(DueWindow.allCases) { Text($0.label).tag($0) }
+                    }
+                    Picker("优先级", selection: $filter.priority) {
+                        Text("不限").tag(Priority?.none)
+                        ForEach(Priority.allCases) {
+                            Text($0.label).tag(Priority?.some($0))
+                        }
+                    }
+                    Toggle("仅含子任务", isOn: $filter.hasChecklistOnly)
+                    Picker("科目", selection: $filter.subjectId) {
+                        Text("全部科目").tag(UUID?.none)
+                        ForEach(subjects.sorted { $0.name < $1.name }) {
+                            Text($0.name).tag(UUID?.some($0.id))
+                        }
+                    }
+                    if !filter.isDefault {
+                        Divider()
+                        Button("重置筛选") { filter.reset() }
+                    }
+                } label: {
                     SafeSystemImage(
                         systemName: filter.isDefault ? "line.3.horizontal.decrease.circle" : "line.3.horizontal.decrease.circle.fill",
                         fallback: "slider.horizontal.3"
                     )
                 }
+                .menuIndicator(.hidden)
                 .accessibilityLabel("筛选")
-                .popover(isPresented: $showFilters, arrowEdge: .bottom) {
-                    FilterPopover(filter: $filter, subjects: subjects)
-                }
-                // 紧凑设备上也保持小型弹窗，不自动放大成整页背景。
-                .presentationCompactAdaptation(.popover)
                 Button(action: onNewAssignment) {
                     SafeSystemImage(systemName: "plus", fallback: "circle")
                 }
@@ -163,7 +194,8 @@ struct AssignmentListView: View {
                                 onToggle: { toggleComplete(task) },
                                 onOpen: { selectedAssignmentId = task.id },
                                 onEdit: { editingAssignment = task },
-                                onSchedule: { schedulingAssignment = task }
+                                onSchedule: { schedulingAssignment = task },
+                                previewedAttachmentID: $previewedAttachmentID
                             )
                             .tag(task.id)
                         }
@@ -248,6 +280,7 @@ struct AssignmentRow: View {
     let onOpen: () -> Void
     let onEdit: () -> Void
     let onSchedule: () -> Void
+    @Binding var previewedAttachmentID: UUID?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -324,7 +357,10 @@ struct AssignmentRow: View {
                 }
 
                 if !assignment.attachments.isEmpty {
-                    AssignmentAttachmentThumbnails(attachments: assignment.attachments)
+                    AssignmentAttachmentThumbnails(
+                        attachments: assignment.attachments,
+                        previewedAttachmentID: $previewedAttachmentID
+                    )
                 }
             }
         }
@@ -339,118 +375,10 @@ struct AssignmentRow: View {
     }
 }
 
-private struct FilterPopover: View {
-    @Binding var filter: AssignmentFilter
-    let subjects: [Subject]
-
-    /// 使用固定宽度的紧凑玻璃面板，避免筛选卡片铺满过大的系统弹窗背景。
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack(spacing: 8) {
-                Label("筛选", systemImage: "line.3.horizontal.decrease")
-                    .font(.headline)
-                Spacer(minLength: 8)
-                if !filter.isDefault {
-                    Button("重置") { filter.reset() }
-                        .buttonStyle(.borderless)
-                        .font(.subheadline)
-                }
-            }
-
-            HStack(spacing: 8) {
-                FilterCard(title: "截止日期", icon: "calendar") {
-                    Picker("截止日期", selection: $filter.dueWindow) {
-                        ForEach(DueWindow.allCases) { Text($0.label).tag($0) }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                FilterCard(title: "优先级", icon: "exclamationmark.circle") {
-                    Picker("优先级", selection: $filter.priority) {
-                        Text("不限").tag(Priority?.none)
-                        ForEach(Priority.allCases) {
-                            Text($0.label).tag(Priority?.some($0))
-                        }
-                    }
-                    .labelsHidden()
-                    .pickerStyle(.menu)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-            }
-
-            FilterCard(title: "仅含子任务", icon: "checklist") {
-                Toggle("仅含子任务", isOn: $filter.hasChecklistOnly)
-                    .labelsHidden()
-                    .toggleStyle(.switch)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-
-            FilterCard(title: "科目", icon: "book.closed") {
-                Picker("科目", selection: $filter.subjectId) {
-                    Text("全部科目").tag(UUID?.none)
-                    ForEach(subjects.sorted { $0.name < $1.name }) {
-                        Text($0.name).tag(UUID?.some($0.id))
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-        }
-        .padding(12)
-        .frame(width: 300, alignment: .leading)
-        .studyFlowGlassSurface(cornerRadius: 20)
-        .presentationBackground(.clear)
-    }
-}
-
-/// 将单个筛选条件包装为紧凑的小卡片，保持标题与控件的层级清晰。
-private struct FilterCard<Content: View>: View {
-    let title: String
-    let icon: String
-    private let content: Content
-
-    init(
-        title: String,
-        icon: String,
-        @ViewBuilder content: () -> Content
-    ) {
-        self.title = title
-        self.icon = icon
-        self.content = content()
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Label {
-                Text(title)
-            } icon: {
-                SafeSystemImage(systemName: icon, fallback: "slider.horizontal.3")
-            }
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(.secondary)
-
-            content
-        }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(.thinMaterial)
-        )
-        .overlay {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        }
-    }
-}
-
-
 /// 作业行内的图片附件缩略图，最多展示三张并以数量角标表示剩余附件。
 private struct AssignmentAttachmentThumbnails: View {
     let attachments: [ImageAttachment]
+    @Binding var previewedAttachmentID: UUID?
 
     private var sortedAttachments: [ImageAttachment] {
         attachments.sorted { $0.createdAt < $1.createdAt }
@@ -459,23 +387,19 @@ private struct AssignmentAttachmentThumbnails: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(sortedAttachments.prefix(3), id: \.id) { attachment in
-                Group {
-                    if let image = UIImage(data: attachment.imageData) {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    }
+                Button {
+                    previewedAttachmentID = attachment.id
+                } label: {
+                    AttachmentThumbnailImage(attachment: attachment)
+                        .frame(width: 38, height: 38)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.primary.opacity(0.1))
+                        }
                 }
-                .frame(width: 38, height: 38)
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 8)
-                        .strokeBorder(Color.primary.opacity(0.1))
-                }
-                .accessibilityLabel("附件：\(attachment.fileName)")
+                .buttonStyle(.plain)
+                .accessibilityLabel("全屏查看附件：\(attachment.fileName)")
             }
 
             if sortedAttachments.count > 3 {

@@ -69,7 +69,7 @@ final class ICloudSyncCoordinator {
             }
             isEnabled = true
             defaults.set(true, forKey: Key.enabled)
-            synchronize(context: context)
+            Task { await synchronize(context: context) }
         } else {
             isEnabled = false
             defaults.set(false, forKey: Key.enabled)
@@ -102,7 +102,7 @@ final class ICloudSyncCoordinator {
             lastMessage = "同步文件夹已更新。"
             defaults.set(lastMessage, forKey: Key.lastMessage)
             if isEnabled {
-                synchronize(context: context)
+                Task { await synchronize(context: context) }
             }
             return true
         } catch {
@@ -122,8 +122,8 @@ final class ICloudSyncCoordinator {
     }
 
     @discardableResult
-    /// 按修改时间比较并合并本地与 iCloud 文件。
-    func synchronize(context: ModelContext) -> Bool {
+    /// 按修改时间比较并合并本地与 iCloud 文件；打包与文件读写全部在后台执行。
+    func synchronize(context: ModelContext) async -> Bool {
         // 手动同步只要求已选择文件夹；自动同步仍由开关和定时逻辑控制。
         guard folderBookmark != nil else {
             lastMessage = "尚未选择同步文件夹。"
@@ -150,61 +150,27 @@ final class ICloudSyncCoordinator {
         do {
             let localURL = try localSyncURL()
             let cloudURL = folder.appendingPathComponent(Self.fileName, isDirectory: false)
-            let fileManager = FileManager.default
-            let localExists = fileManager.fileExists(atPath: localURL.path)
-            let cloudExists = fileManager.fileExists(atPath: cloudURL.path)
+            let container = context.container
 
-            // 写入本地镜像时保留原时间戳，交由同步逻辑按新旧文件比较。
-            if localExists {
-                let localDate = try DataExportService.modificationDate(of: localURL)
-                try DataExportService.writeCurrentBackup(
-                    context: context,
-                    to: localURL,
-                    modificationDate: localDate
-                )
+            // 读文件、按数据库重建含图片的 ZIP 都放到后台线程：
+            // 主线程只负责数据库写入，启动与手动同步都不再卡顿。
+            let outcome = try await Self.onBackground {
+                try Self.mergeFiles(container: container, localURL: localURL, cloudURL: cloudURL)
             }
 
-            let message: String
-            if localExists, cloudExists {
-                let localDate = try DataExportService.modificationDate(of: localURL)
-                let cloudDate = try DataExportService.modificationDate(of: cloudURL)
-
-                if localDate > cloudDate {
-                    let data = try Data(contentsOf: localURL)
-                    try DataExportService.write(data, to: cloudURL, modificationDate: localDate)
-                    message = "同步完成：本地文件较新，已更新 iCloud 文件。"
-                } else if cloudDate > localDate {
-                    let data = try Data(contentsOf: cloudURL)
-                    try DataExportService.restore(data: data, into: context)
-                    try DataExportService.write(data, to: localURL, modificationDate: cloudDate)
-                    message = "同步完成：iCloud 文件较新，已更新本地数据。"
-                } else {
-                    message = "同步完成：两端修改时间相同，无需覆盖。"
-                }
-            } else if cloudExists {
-                let cloudDate = try DataExportService.modificationDate(of: cloudURL)
-                let data = try Data(contentsOf: cloudURL)
+            switch outcome {
+            case let .finished(message):
+                recordSuccessfulSync(message: message)
+                return true
+            case let .pulled(data, date, message):
+                // 云端较新：先在主线程恢复数据库，再把云端文件写回本地镜像。
                 try DataExportService.restore(data: data, into: context)
-                try DataExportService.write(data, to: localURL, modificationDate: cloudDate)
-                message = "已从 iCloud 文件更新本地数据。"
-            } else {
-                let data = localExists
-                    ? try Data(contentsOf: localURL)
-                    : try DataExportService.currentData(context: context)
-                let timestamp = localExists
-                    ? try DataExportService.modificationDate(of: localURL)
-                    : .now
-                if !localExists {
-                    try DataExportService.write(data, to: localURL, modificationDate: timestamp)
+                try await Self.onBackground {
+                    try DataExportService.write(data, to: localURL, modificationDate: date)
                 }
-                try DataExportService.write(data, to: cloudURL, modificationDate: timestamp)
-                message = localExists
-                    ? "已将本地同步文件写入 iCloud。"
-                    : "已创建本地与 iCloud 同步文件。"
+                recordSuccessfulSync(message: message)
+                return true
             }
-
-            recordSuccessfulSync(message: message)
-            return true
         } catch {
             lastMessage = "同步失败：\(error.localizedDescription)"
             defaults.set(lastMessage, forKey: Key.lastMessage)
@@ -212,44 +178,174 @@ final class ICloudSyncCoordinator {
         }
     }
 
-    /// 应用启动时执行到期或必要的同步。
-    func performLaunchSyncIfNeeded(context: ModelContext) {
+    /// 后台线程完成的同步结果。
+    private enum SyncOutcome: Sendable {
+        /// 已处理完成（推送或无需改动），只带提示文案。
+        case finished(String)
+        /// 云端较新：携带云端数据，由主线程恢复数据库。
+        case pulled(data: Data, date: Date, message: String)
+    }
+
+    /// 在后台队列执行重活（打包备份 / 文件读写），避免阻塞主线程。
+    private nonisolated static func onBackground<T: Sendable>(
+        _ work: @escaping @Sendable () throws -> T
+    ) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                do {
+                    continuation.resume(returning: try work())
+                } catch {
+                    continuation.resume(throwing: error)
+                }
+            }
+        }
+    }
+
+    /// 比较并更新本地/云端同步文件；只在后台线程调用。
+    /// 本地镜像每次用当前数据库重建（保持原比较时间戳），推送时直接复制文件。
+    private nonisolated static func mergeFiles(
+        container: ModelContainer,
+        localURL: URL,
+        cloudURL: URL
+    ) throws -> SyncOutcome {
+        let fileManager = FileManager.default
+        let localExists = fileManager.fileExists(atPath: localURL.path)
+        let cloudExists = fileManager.fileExists(atPath: cloudURL.path)
+        let backgroundContext = ModelContext(container)
+
+        if localExists {
+            let localDate = try DataExportService.modificationDate(of: localURL)
+            try DataExportService.writeArchive(
+                context: backgroundContext,
+                to: localURL,
+                modificationDate: localDate
+            )
+        }
+
+        if localExists, cloudExists {
+            let localDate = try DataExportService.modificationDate(of: localURL)
+            let cloudDate = try DataExportService.modificationDate(of: cloudURL)
+
+            if localDate > cloudDate {
+                try copyReplacingFile(from: localURL, to: cloudURL)
+                try fileManager.setAttributes(
+                    [.modificationDate: localDate],
+                    ofItemAtPath: cloudURL.path
+                )
+                return .finished("同步完成：本地文件较新，已更新 iCloud 文件。")
+            }
+            if cloudDate > localDate {
+                let data = try Data(contentsOf: cloudURL)
+                return .pulled(
+                    data: data,
+                    date: cloudDate,
+                    message: "同步完成：iCloud 文件较新，已更新本地数据。"
+                )
+            }
+            return .finished("同步完成：两端修改时间相同，无需覆盖。")
+        }
+
+        if cloudExists {
+            let cloudDate = try DataExportService.modificationDate(of: cloudURL)
+            let data = try Data(contentsOf: cloudURL)
+            return .pulled(data: data, date: cloudDate, message: "已从 iCloud 文件更新本地数据。")
+        }
+
+        let timestamp = localExists
+            ? try DataExportService.modificationDate(of: localURL)
+            : Date.now
+        if !localExists {
+            try DataExportService.writeArchive(
+                context: backgroundContext,
+                to: localURL,
+                modificationDate: timestamp
+            )
+        }
+        try copyReplacingFile(from: localURL, to: cloudURL)
+        try fileManager.setAttributes(
+            [.modificationDate: timestamp],
+            ofItemAtPath: cloudURL.path
+        )
+        return .finished(
+            localExists
+                ? "已将本地同步文件写入 iCloud。"
+                : "已创建本地与 iCloud 同步文件。"
+        )
+    }
+
+    /// 文件到文件的复制替换：避免把整份 ZIP 读回内存。
+    private nonisolated static func copyReplacingFile(from source: URL, to destination: URL) throws {
+        let fileManager = FileManager.default
+        let tempURL = destination.deletingLastPathComponent()
+            .appendingPathComponent(".\(destination.lastPathComponent).\(UUID().uuidString).tmp")
+        do {
+            try fileManager.copyItem(at: source, to: tempURL)
+            if fileManager.fileExists(atPath: destination.path) {
+                _ = try fileManager.replaceItemAt(destination, withItemAt: tempURL)
+            } else {
+                try fileManager.moveItem(at: tempURL, to: destination)
+            }
+        } catch {
+            try? fileManager.removeItem(at: tempURL)
+            throw error
+        }
+    }
+
+    /// 应用启动时执行到期或必要的同步；打包在后台完成，不拖慢启动。
+    func performLaunchSyncIfNeeded(context: ModelContext) async {
         guard isEnabled else { return }
 
         if scheduledTimeReached && lastScheduledSyncDay != todayKey {
-            if synchronize(context: context) {
+            if await synchronize(context: context) {
                 markScheduledSyncCompleted()
             }
         } else {
-            synchronize(context: context)
+            await synchronize(context: context)
         }
     }
 
     /// 应用运行期间检查每日同步时间。
-    func checkScheduledSyncIfNeeded(context: ModelContext) {
+    func checkScheduledSyncIfNeeded(context: ModelContext) async {
         guard isEnabled,
               scheduledTimeReached,
               lastScheduledSyncDay != todayKey
         else { return }
 
-        if synchronize(context: context) {
+        if await synchronize(context: context) {
             markScheduledSyncCompleted()
         }
     }
 
     /// 数据变更后刷新本地同步比较文件。
+    ///
+    /// 只更新比较用的修改时间：ZIP 内容交由下一次同步时按需重建。
+    /// 此前每次保存都会在主线程把全部图片重新 Base64 并打包一遍，
+    /// 附件一多就会让“保存/编辑”明显卡顿甚至触发内存崩溃。
     func refreshLocalSnapshotIfNeeded(context: ModelContext) {
         guard isEnabled, let localURL = try? localSyncURL() else { return }
+        let fileManager = FileManager.default
+
+        guard fileManager.fileExists(atPath: localURL.path) else {
+            // 首次开启同步：创建一次比较文件，之后只更新时间戳。
+            do {
+                try DataExportService.writeArchive(
+                    context: context,
+                    to: localURL,
+                    modificationDate: .now
+                )
+            } catch {
+                NSLog("StudyFlow local sync snapshot refresh failed: \(error.localizedDescription)")
+            }
+            return
+        }
 
         do {
-            // 首次编辑也必须创建比较文件；更新内容时刷新时间戳，确保下次同步能上传新 ZIP。
-            try DataExportService.writeCurrentBackup(
-                context: context,
-                to: localURL,
-                modificationDate: .now
+            try fileManager.setAttributes(
+                [.modificationDate: Date.now],
+                ofItemAtPath: localURL.path
             )
         } catch {
-            NSLog("StudyFlow local sync snapshot refresh failed: \(error.localizedDescription)")
+            NSLog("StudyFlow local sync snapshot timestamp failed: \(error.localizedDescription)")
         }
     }
 

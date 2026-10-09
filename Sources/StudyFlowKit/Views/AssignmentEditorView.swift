@@ -1,7 +1,7 @@
+import PhotosUI
 import SwiftData
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 private struct DraftSubtask: Identifiable, Equatable {
     let id: UUID
@@ -48,7 +48,7 @@ struct AssignmentEditorView: View {
     @State private var reminderLeadHours: Int
     @State private var subtasks: [DraftSubtask]
     @State private var attachments: [DraftAttachment]
-    @State private var isImportingAttachments = false
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
 
     init(mode: Mode, subjects: [Subject]) {
         self.mode = mode
@@ -213,19 +213,19 @@ struct AssignmentEditorView: View {
                         }
                     }
 
-                    Button {
-                        isImportingAttachments = true
-                    } label: {
-                        Label("添加图片附件…", systemImage: "photo.badge.plus")
+                    // 使用系统 PhotosPicker 直接读取照片库，无需自行处理安全作用域 URL。
+                    PhotosPicker(
+                        selection: $selectedPhotoItems,
+                        maxSelectionCount: 10,
+                        matching: .images
+                    ) {
+                        Label("从照片选择附件…", systemImage: "photo.badge.plus")
                             .frame(maxWidth: .infinity, minHeight: 44)
                     }
                     .studyFlowGlassButtonStyle()
-                    .fileImporter(
-                        isPresented: $isImportingAttachments,
-                        allowedContentTypes: [.image],
-                        allowsMultipleSelection: true
-                    ) { result in
-                        importAttachments(from: result)
+                    .onChange(of: selectedPhotoItems) { _, items in
+                        guard !items.isEmpty else { return }
+                        Task { await importSelectedPhotos(from: items) }
                     }
                 } header: {
                     Text("图片附件")
@@ -388,36 +388,47 @@ struct AssignmentEditorView: View {
         }
     }
 
-    /// 读取系统选择器返回的图片并加入附件草稿。
-    private func importAttachments(from result: Result<[URL], Error>) {
-        guard case let .success(urls) = result else { return }
-        for url in urls {
-            guard url.startAccessingSecurityScopedResource() else { continue }
-            defer { url.stopAccessingSecurityScopedResource() }
-            guard let data = try? Data(contentsOf: url), !data.isEmpty else { continue }
-            let fileName = url.lastPathComponent
-            let mimeType = Self.mimeType(forExtension: url.pathExtension)
-            guard !attachments.contains(where: { $0.fileName == fileName && $0.imageData == data }) else { continue }
+    /// 将 PhotosPicker 返回的原图数据加入附件草稿。
+    @MainActor
+    private func importSelectedPhotos(from items: [PhotosPickerItem]) async {
+        for item in items {
+            guard let imageData = try? await item.loadTransferable(type: Data.self),
+                  !imageData.isEmpty
+            else { continue }
+
+            guard !attachments.contains(where: { $0.imageData == imageData }) else { continue }
+            let mimeType = Self.mimeType(for: imageData)
+            let fileExtension = BackupArchive.fileExtension(for: mimeType)
             attachments.append(
                 DraftAttachment(
                     id: UUID(),
-                    fileName: fileName,
+                    fileName: "IMG-\(UUID().uuidString.prefix(8)).\(fileExtension)",
                     mimeType: mimeType,
-                    imageData: data
+                    imageData: imageData
                 )
             )
         }
+        selectedPhotoItems.removeAll()
     }
 
-    private static func mimeType(forExtension ext: String) -> String {
-        switch ext.lowercased() {
-        case "png": "image/png"
-        case "gif": "image/gif"
-        case "heic", "heif": "image/heic"
-        case "webp": "image/webp"
-        case "bmp": "image/bmp"
-        default: "image/jpeg"
+    /// 根据图片文件头识别 MIME，避免 PhotosPicker 返回的数据依赖扩展名。
+    private static func mimeType(for data: Data) -> String {
+        guard data.count >= 12 else { return "image/jpeg" }
+        let bytes = [UInt8](data.prefix(12))
+
+        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
+        if bytes.starts(with: Array("GIF8".utf8)) { return "image/gif" }
+        if bytes.starts(with: Array("BM".utf8)) { return "image/bmp" }
+        if bytes.starts(with: Array("RIFF".utf8)) && bytes[8...11].elementsEqual(ArraySlice("WEBP".utf8)) {
+            return "image/webp"
         }
+
+        if bytes[4...7].elementsEqual(ArraySlice("ftyp".utf8)) {
+            let brand = String(decoding: bytes[8...11], as: UTF8.self).lowercased()
+            if ["avif", "avis"].contains(brand) { return "image/avif" }
+            return "image/heic"
+        }
+        return "image/jpeg"
     }
 
     @MainActor
@@ -477,21 +488,8 @@ private struct AttachmentDraftThumbnail: View {
     let onDelete: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            if let image = UIImage(data: attachment.imageData) {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.secondary.opacity(0.12))
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    }
-            }
-        }
-        .frame(width: 76, height: 76)
+        AttachmentThumbnailImage(id: attachment.id, data: attachment.imageData)
+            .frame(width: 76, height: 76)
         .clipShape(RoundedRectangle(cornerRadius: 14))
         .overlay {
             RoundedRectangle(cornerRadius: 14)
