@@ -12,76 +12,112 @@ enum BackupArchive {
     private static let endSignature: UInt32 = 0x0605_4B50
     private static let utf8Flag: UInt16 = 0x0800
 
+    /// 标准 CRC-32（IEEE 反射式）查表实现：与逐位算法结果一致，速度快一个数量级。
+    private static let crcTable: [UInt32] = makeCRCTable()
+
+    private static func makeCRCTable() -> [UInt32] {
+        (0..<256).map { index in
+            var value = UInt32(index)
+            for _ in 0..<8 {
+                value = (value & 1) == 1 ? (value >> 1) ^ 0xEDB8_8320 : value >> 1
+            }
+            return value
+        }
+    }
+
     /// 以 ZIP Store 方式创建无额外依赖的合法备份包。
     static func create(entries: [Entry]) throws -> Data {
         var localData = Data()
         var centralData = Data()
         var offsets: [Int] = []
+        var checksums: [UInt32] = []
 
         for entry in entries {
-            let name = Data(entry.path.utf8)
             let crc = crc32(entry.data)
-            let offset = localData.count
-            offsets.append(offset)
-
-            var local = Data()
-            local.appendLE(localHeaderSignature)
-            local.appendLE(UInt16(20))
-            local.appendLE(utf8Flag)
-            local.appendLE(UInt16(0))
-            local.appendLE(dosTime(from: .now))
-            local.appendLE(dosDate(from: .now))
-            local.appendLE(crc)
-            local.appendLE(UInt32(entry.data.count))
-            local.appendLE(UInt32(entry.data.count))
-            local.appendLE(UInt16(name.count))
-            local.appendLE(UInt16(0))
-            local.append(name)
-            local.append(entry.data)
-            localData.append(local)
+            offsets.append(localData.count)
+            checksums.append(crc)
+            localData.append(localHeader(for: entry, crc: crc))
+            localData.append(entry.data)
         }
 
         let centralOffset = localData.count
         for (index, entry) in entries.enumerated() {
-            let name = Data(entry.path.utf8)
-            let crc = crc32(entry.data)
-            var central = Data()
-            central.appendLE(centralHeaderSignature)
-            central.appendLE(UInt16(20))
-            central.appendLE(UInt16(20))
-            central.appendLE(utf8Flag)
-            central.appendLE(UInt16(0))
-            central.appendLE(dosTime(from: .now))
-            central.appendLE(dosDate(from: .now))
-            central.appendLE(crc)
-            central.appendLE(UInt32(entry.data.count))
-            central.appendLE(UInt32(entry.data.count))
-            central.appendLE(UInt16(name.count))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt16(0))
-            central.appendLE(UInt32(0))
-            central.appendLE(UInt32(offsets[index]))
-            central.append(name)
-            centralData.append(central)
+            centralData.append(
+                centralHeader(for: entry, crc: checksums[index], offset: offsets[index])
+            )
         }
 
-        var end = Data()
-        end.appendLE(endSignature)
-        end.appendLE(UInt16(0))
-        end.appendLE(UInt16(0))
-        end.appendLE(UInt16(entries.count))
-        end.appendLE(UInt16(entries.count))
-        end.appendLE(UInt32(centralData.count))
-        end.appendLE(UInt32(centralOffset))
-        end.appendLE(UInt16(0))
+        let end = endRecord(
+            entryCount: entries.count,
+            centralSize: centralData.count,
+            centralOffset: centralOffset
+        )
 
         var archive = Data()
         archive.append(localData)
         archive.append(centralData)
         archive.append(end)
         return archive
+    }
+
+    /// 把条目直接流式写入 ZIP 文件，避免在内存里再拼一份同样大小的归档。
+    /// 附件很多时，这一步能显著降低同步的峰值内存。
+    static func write(entries: [Entry], to url: URL) throws {
+        let fileManager = FileManager.default
+        let directory = url.deletingLastPathComponent()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        let tempURL = directory
+            .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
+        guard fileManager.createFile(atPath: tempURL.path, contents: nil) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+
+        let handle = try FileHandle(forWritingTo: tempURL)
+        do {
+            var offset = 0
+            var offsets: [Int] = []
+            var checksums: [UInt32] = []
+            for entry in entries {
+                let crc = crc32(entry.data)
+                let header = localHeader(for: entry, crc: crc)
+                offsets.append(offset)
+                checksums.append(crc)
+                try handle.write(contentsOf: header)
+                try handle.write(contentsOf: entry.data)
+                offset += header.count + entry.data.count
+            }
+
+            let centralOffset = offset
+            var centralSize = 0
+            for (index, entry) in entries.enumerated() {
+                let header = centralHeader(for: entry, crc: checksums[index], offset: offsets[index])
+                try handle.write(contentsOf: header)
+                centralSize += header.count
+            }
+
+            try handle.write(contentsOf: endRecord(
+                entryCount: entries.count,
+                centralSize: centralSize,
+                centralOffset: centralOffset
+            ))
+            try handle.close()
+        } catch {
+            try? handle.close()
+            try? fileManager.removeItem(at: tempURL)
+            throw error
+        }
+
+        do {
+            if fileManager.fileExists(atPath: url.path) {
+                _ = try fileManager.replaceItemAt(url, withItemAt: tempURL)
+            } else {
+                try fileManager.moveItem(at: tempURL, to: url)
+            }
+        } catch {
+            try? fileManager.removeItem(at: tempURL)
+            throw error
+        }
     }
 
     /// 从 StudyFlow ZIP 中读取指定条目；只支持本应用生成的 Store 归档。
@@ -148,12 +184,70 @@ enum BackupArchive {
         }
     }
 
+    // MARK: - ZIP 头部构造（create 与 write 共用，保证两种写法字节一致）
+
+    private static func localHeader(for entry: Entry, crc: UInt32) -> Data {
+        let name = Data(entry.path.utf8)
+        var header = Data()
+        header.appendLE(localHeaderSignature)
+        header.appendLE(UInt16(20))
+        header.appendLE(utf8Flag)
+        header.appendLE(UInt16(0))
+        header.appendLE(dosTime(from: .now))
+        header.appendLE(dosDate(from: .now))
+        header.appendLE(crc)
+        header.appendLE(UInt32(entry.data.count))
+        header.appendLE(UInt32(entry.data.count))
+        header.appendLE(UInt16(name.count))
+        header.appendLE(UInt16(0))
+        header.append(name)
+        return header
+    }
+
+    private static func centralHeader(for entry: Entry, crc: UInt32, offset: Int) -> Data {
+        let name = Data(entry.path.utf8)
+        var header = Data()
+        header.appendLE(centralHeaderSignature)
+        header.appendLE(UInt16(20))
+        header.appendLE(UInt16(20))
+        header.appendLE(utf8Flag)
+        header.appendLE(UInt16(0))
+        header.appendLE(dosTime(from: .now))
+        header.appendLE(dosDate(from: .now))
+        header.appendLE(crc)
+        header.appendLE(UInt32(entry.data.count))
+        header.appendLE(UInt32(entry.data.count))
+        header.appendLE(UInt16(name.count))
+        header.appendLE(UInt16(0))
+        header.appendLE(UInt16(0))
+        header.appendLE(UInt16(0))
+        header.appendLE(UInt16(0))
+        header.appendLE(UInt32(0))
+        header.appendLE(UInt32(offset))
+        header.append(name)
+        return header
+    }
+
+    private static func endRecord(entryCount: Int, centralSize: Int, centralOffset: Int) -> Data {
+        var end = Data()
+        end.appendLE(endSignature)
+        end.appendLE(UInt16(0))
+        end.appendLE(UInt16(0))
+        end.appendLE(UInt16(entryCount))
+        end.appendLE(UInt16(entryCount))
+        end.appendLE(UInt32(centralSize))
+        end.appendLE(UInt32(centralOffset))
+        end.appendLE(UInt16(0))
+        return end
+    }
+
+    // MARK: - 校验与时序
+
     private static func crc32(_ data: Data) -> UInt32 {
         var crc = UInt32.max
-        for byte in data {
-            crc ^= UInt32(byte)
-            for _ in 0..<8 {
-                crc = (crc & 1) == 1 ? (crc >> 1) ^ 0xEDB8_8320 : crc >> 1
+        data.withUnsafeBytes { rawBuffer in
+            for byte in rawBuffer.bindMemory(to: UInt8.self) {
+                crc = crcTable[Int((crc ^ UInt32(byte)) & 0xFF)] ^ (crc >> 8)
             }
         }
         return crc ^ UInt32.max

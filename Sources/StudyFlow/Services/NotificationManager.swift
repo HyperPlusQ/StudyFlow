@@ -5,9 +5,17 @@ final class NotificationManager: @unchecked Sendable {
     static let shared = NotificationManager()
     private init() {}
 
+    /// 系统通知中心只在真正的 App Bundle 中可用；命令行与单元测试进程没有 bundle proxy，
+    /// 直接调用 UNUserNotificationCenter.current() 会抛出无法捕获的 NSException。
+    private static var notificationCenter: UNUserNotificationCenter? {
+        guard Bundle.main.bundleURL.pathExtension == "app" else { return nil }
+        return UNUserNotificationCenter.current()
+    }
+
     func requestAuthorization() async {
+        guard let center = Self.notificationCenter else { return }
         do {
-            _ = try await UNUserNotificationCenter.current()
+            _ = try await center
                 .requestAuthorization(options: [.alert, .sound, .badge])
         } catch {
             NSLog("StudyFlow notification authorization failed: \(error.localizedDescription)")
@@ -17,7 +25,8 @@ final class NotificationManager: @unchecked Sendable {
     /// 按截止时间和提前提醒时长创建本地通知。
     func schedule(for assignment: Assignment) {
         cancel(for: assignment.id)
-        guard !assignment.isCompleted,
+        guard let center = Self.notificationCenter,
+              !assignment.isCompleted,
               let due = assignment.dueDate,
               let triggerDate = Calendar.current.date(
                 byAdding: .hour,
@@ -42,20 +51,23 @@ final class NotificationManager: @unchecked Sendable {
             content: content,
             trigger: UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         )
-        UNUserNotificationCenter.current().add(request)
+        center.add(request)
     }
 
     /// 取消指定作业的本地通知。
     func cancel(for id: UUID) {
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(withIdentifiers: ["assignment-\(id.uuidString)"])
+        guard let center = Self.notificationCenter else { return }
+        center.removePendingNotificationRequests(withIdentifiers: ["assignment-\(id.uuidString)"])
     }
 
 
     /// 按科目的作业布置间隔创建下一次登记提醒。
     func scheduleSubjectReminder(subject: Subject, latestAssignmentCreatedAt: Date?) {
         cancelSubjectReminder(for: subject.id)
-        guard let days = subject.assignmentIntervalDays, days > 0 else { return }
+        guard let center = Self.notificationCenter,
+              let days = subject.assignmentIntervalDays,
+              days > 0
+        else { return }
 
         let registeredAt = subject.lastAssignmentRegisteredAt
             ?? latestAssignmentCreatedAt
@@ -80,7 +92,7 @@ final class NotificationManager: @unchecked Sendable {
                 repeats: false
             )
         )
-        UNUserNotificationCenter.current().add(request)
+        center.add(request)
     }
 
     /// 启动、导入、同步和保存后统一刷新所有科目的布置提醒。
@@ -106,8 +118,8 @@ final class NotificationManager: @unchecked Sendable {
 
     /// 取消指定科目的作业布置提醒。
     func cancelSubjectReminder(for id: UUID) {
-        UNUserNotificationCenter.current()
-            .removePendingNotificationRequests(
+        guard let center = Self.notificationCenter else { return }
+        center.removePendingNotificationRequests(
                 withIdentifiers: ["subject-reminder-\(id.uuidString)"]
             )
     }

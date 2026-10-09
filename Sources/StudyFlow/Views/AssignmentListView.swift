@@ -333,23 +333,19 @@ private struct AssignmentAttachmentThumbnails: View {
     var body: some View {
         HStack(spacing: 6) {
             ForEach(sortedAttachments.prefix(3), id: \.id) { attachment in
-                Group {
-                    if let image = NSImage(data: attachment.imageData) {
-                        Image(nsImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                    } else {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    }
+                Button {
+                    AttachmentPreviewWindowController.shared.present(attachment: attachment)
+                } label: {
+                    AttachmentThumbnailImage(attachment: attachment)
+                        .frame(width: 34, height: 34)
+                        .clipShape(RoundedRectangle(cornerRadius: 7))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: 7)
+                                .strokeBorder(Color.primary.opacity(0.1))
+                        }
                 }
-                .frame(width: 34, height: 34)
-                .clipShape(RoundedRectangle(cornerRadius: 7))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 7)
-                        .strokeBorder(Color.primary.opacity(0.1))
-                }
-                .accessibilityLabel("附件：\(attachment.fileName)")
+                .buttonStyle(.plain)
+                .accessibilityLabel("全屏预览附件：\(attachment.fileName)")
             }
 
             if sortedAttachments.count > 3 {

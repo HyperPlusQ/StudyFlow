@@ -1,4 +1,5 @@
 import AppKit
+import PhotosUI
 import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
@@ -49,6 +50,7 @@ struct AssignmentEditorView: View {
     @State private var subtasks: [DraftSubtask]
     @State private var attachments: [DraftAttachment]
     @State private var isImportingAttachments = false
+    @State private var pickedPhotos: [PhotosPickerItem] = []
 
     init(mode: Mode, subjects: [Subject]) {
         self.mode = mode
@@ -207,6 +209,13 @@ struct AssignmentEditorView: View {
                                 ForEach(attachments) { attachment in
                                     AttachmentDraftThumbnail(
                                         attachment: attachment,
+                                        onPreview: {
+                                            AttachmentPreviewWindowController.shared.present(
+                                                fileName: attachment.fileName,
+                                                mimeType: attachment.mimeType,
+                                                data: attachment.imageData
+                                            )
+                                        },
                                         onDelete: {
                                             attachments.removeAll { $0.id == attachment.id }
                                         }
@@ -217,10 +226,23 @@ struct AssignmentEditorView: View {
                         }
                     }
 
+                    // 系统媒体选择器：直接访问照片图库，无需额外的相册权限。
+                    PhotosPicker(
+                        selection: $pickedPhotos,
+                        maxSelectionCount: 10,
+                        matching: .images
+                    ) {
+                        Label("从照片中选择图片…", systemImage: "photo.badge.plus")
+                    }
+                    .onChange(of: pickedPhotos) { _, items in
+                        guard !items.isEmpty else { return }
+                        Task { await importPickedPhotos(items) }
+                    }
+
                     Button {
                         isImportingAttachments = true
                     } label: {
-                        Label("添加图片附件…", systemImage: "photo.badge.plus")
+                        Label("从文件中选择图片…", systemImage: "folder")
                     }
                     .fileImporter(
                         isPresented: $isImportingAttachments,
@@ -397,6 +419,61 @@ struct AssignmentEditorView: View {
         }
     }
 
+    /// 读取媒体选择器（照片图库）返回的图片并加入附件草稿。
+    @MainActor
+    private func importPickedPhotos(_ items: [PhotosPickerItem]) async {
+        defer { pickedPhotos = [] }
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  !data.isEmpty,
+                  !attachments.contains(where: { $0.imageData == data })
+            else { continue }
+
+            let mimeType = Self.mimeType(forImageData: data)
+            attachments.append(
+                DraftAttachment(
+                    id: UUID(),
+                    fileName: Self.fileName(for: item, mimeType: mimeType),
+                    mimeType: mimeType,
+                    imageData: data
+                )
+            )
+        }
+    }
+
+    /// 按二进制头识别图片类型，避免照片导出的通用文件名猜错扩展名。
+    private static func mimeType(forImageData data: Data) -> String {
+        let bytes = [UInt8](data.prefix(12))
+        guard bytes.count >= 4 else { return "image/jpeg" }
+        if bytes.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return "image/png" }
+        if bytes.starts(with: [0xFF, 0xD8, 0xFF]) { return "image/jpeg" }
+        if bytes.starts(with: [0x47, 0x49, 0x46, 0x38]) { return "image/gif" }
+        if bytes.starts(with: [0x52, 0x49, 0x46, 0x46]),
+           bytes.count >= 12,
+           String(decoding: bytes[8..<12], as: UTF8.self) == "WEBP" {
+            return "image/webp"
+        }
+        if bytes.count >= 12,
+           String(decoding: bytes[4..<8], as: UTF8.self) == "ftyp" {
+            let brand = String(decoding: bytes[8..<12], as: UTF8.self).lowercased()
+            let heicBrands = ["heic", "heix", "hevc", "hevx", "mif1", "msf1"]
+            if heicBrands.contains(where: { brand.hasPrefix($0) }) { return "image/heic" }
+        }
+        return "image/jpeg"
+    }
+
+    /// 照片资源可能没有文件名，用资源标识加识别出的扩展名生成可读名称。
+    private static func fileName(for item: PhotosPickerItem, mimeType: String) -> String {
+        let fileExtension = BackupArchive.fileExtension(for: mimeType)
+        if let identifier = item.itemIdentifier, !identifier.isEmpty {
+            let safe = identifier
+                .replacingOccurrences(of: "/", with: "-")
+                .replacingOccurrences(of: ":", with: "-")
+            return safe.lowercased().hasSuffix(".\(fileExtension)") ? safe : "\(safe).\(fileExtension)"
+        }
+        return "照片-\(Int(Date().timeIntervalSince1970)).\(fileExtension)"
+    }
+
     /// 读取系统选择器返回的图片并加入附件草稿。
     private func importAttachments(from result: Result<[URL], Error>) {
         guard case let .success(urls) = result else { return }
@@ -480,32 +557,24 @@ struct AssignmentEditorView: View {
 }
 
 
-/// 附件编辑器中的缩略图和原生删除按钮。
+/// 附件编辑器中的缩略图：点击全屏预览，右下角删除。
 private struct AttachmentDraftThumbnail: View {
     let attachment: DraftAttachment
+    let onPreview: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
-            if let image = NSImage(data: attachment.imageData) {
-                Image(nsImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-            } else {
-                RoundedRectangle(cornerRadius: 10)
-                    .fill(Color.secondary.opacity(0.12))
-                    .overlay {
-                        Image(systemName: "photo")
-                            .foregroundStyle(.secondary)
-                    }
+        Button(action: onPreview) {
+            AttachmentThumbnailImage(id: attachment.id, data: attachment.imageData)
+                .frame(width: 72, height: 72)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay {
+                RoundedRectangle(cornerRadius: 12)
+                    .strokeBorder(Color.primary.opacity(0.08))
             }
         }
-        .frame(width: 72, height: 72)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay {
-            RoundedRectangle(cornerRadius: 12)
-                .strokeBorder(Color.primary.opacity(0.08))
-        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("全屏预览附件：\(attachment.fileName)")
         .overlay(alignment: .bottomTrailing) {
             Button(action: onDelete) {
                 Image(systemName: "xmark.circle.fill")

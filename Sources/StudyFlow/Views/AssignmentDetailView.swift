@@ -143,37 +143,26 @@ struct AssignmentDetailView: View {
                     .font(.callout)
                     .foregroundStyle(.tertiary)
             } else {
-                LazyVGrid(
-                    columns: Array(
-                        repeating: GridItem(.flexible(), spacing: 10),
-                        count: 4
-                    ),
-                    spacing: 10
-                ) {
-                    ForEach(assignment.attachments.sorted { $0.createdAt < $1.createdAt }, id: \.id) { attachment in
-                        if let image = NSImage(data: attachment.imageData) {
-                            Image(nsImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fill)
-                                .frame(height: 150)
-                                .frame(maxWidth: .infinity)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                                .overlay {
-                                    RoundedRectangle(cornerRadius: 12)
-                                        .strokeBorder(Color.primary.opacity(0.08))
-                                }
-                                .accessibilityLabel("附件：\(attachment.fileName)")
-                        } else {
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.secondary.opacity(0.12))
-                                .frame(height: 150)
-                                .overlay {
-                                    Image(systemName: "photo")
-                                        .foregroundStyle(.secondary)
-                                }
-                                .accessibilityLabel("无法预览附件：\(attachment.fileName)")
+                // 横向滚动 + 固定尺寸：图片之间留白明确，多张也不会互相重叠。
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(alignment: .top, spacing: 12) {
+                        ForEach(assignment.attachments.sorted { $0.createdAt < $1.createdAt }, id: \.id) { attachment in
+                            Button {
+                                AttachmentPreviewWindowController.shared.present(attachment: attachment)
+                            } label: {
+                                AttachmentThumbnailImage(attachment: attachment)
+                                    .frame(width: 180, height: 150)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .overlay {
+                                        RoundedRectangle(cornerRadius: 12)
+                                            .strokeBorder(Color.primary.opacity(0.08))
+                                    }
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("全屏预览附件：\(attachment.fileName)")
                         }
                     }
+                    .padding(.vertical, 2)
                 }
             }
         }

@@ -145,19 +145,6 @@ enum DataExportService {
         )
     }
 
-    /// 用当前数据库刷新同步文件，并显式写入用于新旧比较的时间戳。
-    @discardableResult
-    @MainActor
-    static func writeCurrentBackup(
-        context: ModelContext,
-        to url: URL,
-        modificationDate: Date? = nil
-    ) throws -> Data {
-        let data = try makeBackup(context: context)
-        try write(data, to: url, modificationDate: modificationDate)
-        return data
-    }
-
     /// Decodes and validates a complete snapshot before making any destructive database change.
     @MainActor
     /// 校验 JSON 后恢复到当前数据库。
@@ -275,6 +262,65 @@ enum DataExportService {
             subjects: (try? context.fetch(FetchDescriptor<Subject>())) ?? [],
             assignments: (try? context.fetch(FetchDescriptor<Assignment>())) ?? []
         )
+    }
+
+    /// 把当前数据库打包并直接写入文件：ZIP 流式落盘，不在内存里再复制一份归档。
+    /// 附件很多时可明显降低同步与首次建立镜像的峰值内存。
+    static func writeArchive(
+        context: ModelContext,
+        to url: URL,
+        modificationDate: Date?
+    ) throws {
+        let assignments = try context.fetch(FetchDescriptor<Assignment>())
+        let json = try encodedDocument(
+            subjects: try context.fetch(FetchDescriptor<Subject>()),
+            assignments: assignments,
+            timeBlocks: try context.fetch(FetchDescriptor<TimeBlock>()),
+            submissionHistory: try context.fetch(FetchDescriptor<SubmissionHistoryEntry>())
+        )
+
+        var entries = [BackupArchive.Entry(path: "studyflow.json", data: json)]
+        entries += attachmentEntries(assignments: assignments)
+        try BackupArchive.write(entries: entries, to: url)
+
+        if let modificationDate {
+            try FileManager.default.setAttributes(
+                [.modificationDate: modificationDate],
+                ofItemAtPath: url.path
+            )
+        }
+    }
+
+    /// 仅刷新同步比较用的修改时间：ZIP 内容在下一次同步时按需重建。
+    /// 保存或导入后调用，保证本地改动一定比 iCloud 文件“更新”，不会漏传。
+    static func touchModificationDate(at url: URL) throws {
+        guard FileManager.default.fileExists(atPath: url.path) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try FileManager.default.setAttributes(
+            [.modificationDate: Date.now],
+            ofItemAtPath: url.path
+        )
+    }
+
+    /// 附件在 ZIP 中的原始图片条目；与 studyflow.json 内嵌的 Base64 互为备份。
+    private static func attachmentEntries(assignments: [Assignment]) -> [BackupArchive.Entry] {
+        assignments
+            .sorted { $0.createdAt < $1.createdAt }
+            .flatMap { assignment in
+                assignment.attachments
+                    .sorted { $0.createdAt < $1.createdAt }
+                    .map { attachment in
+                        BackupArchive.Entry(
+                            path: BackupArchive.path(
+                                forAttachment: attachment.id,
+                                assignmentID: assignment.id,
+                                mimeType: attachment.mimeType
+                            ),
+                            data: attachment.imageData
+                        )
+                    }
+            }
     }
 
     /// 写入同步文件并保留指定修改时间。
@@ -454,22 +500,7 @@ enum DataExportService {
 
     private static func archive(json: Data, assignments: [Assignment]) throws -> Data {
         var entries = [BackupArchive.Entry(path: "studyflow.json", data: json)]
-        entries += assignments
-            .sorted { $0.createdAt < $1.createdAt }
-            .flatMap { assignment in
-                assignment.attachments
-                    .sorted { $0.createdAt < $1.createdAt }
-                    .map { attachment in
-                        BackupArchive.Entry(
-                            path: BackupArchive.path(
-                                forAttachment: attachment.id,
-                                assignmentID: assignment.id,
-                                mimeType: attachment.mimeType
-                            ),
-                            data: attachment.imageData
-                        )
-                    }
-            }
+        entries += attachmentEntries(assignments: assignments)
         return try BackupArchive.create(entries: entries)
     }
 

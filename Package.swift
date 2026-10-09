@@ -9,6 +9,11 @@ let package = Package(
             name: "StudyFlow",
             path: "Sources/StudyFlow",
             resources: []
+        ),
+        .testTarget(
+            name: "StudyFlowTests",
+            dependencies: ["StudyFlow"],
+            path: "Tests/StudyFlowTests"
         )
     ]
 )
