@@ -1,6 +1,7 @@
 package com.hyperplusq.studyflow.system
 
 import java.io.ByteArrayOutputStream
+import java.io.OutputStream
 import java.util.zip.CRC32
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
@@ -14,20 +15,34 @@ object BackupArchive {
     fun create(entries: List<Pair<String, ByteArray>>): ByteArray {
         require(entries.isNotEmpty()) { "ZIP 备份不能为空" }
         val output = ByteArrayOutputStream()
-        ZipOutputStream(output).use { zip ->
-            entries.forEach { (path, data) ->
-                val entry = ZipEntry(path).apply {
-                    method = ZipEntry.STORED
-                    size = data.size.toLong()
-                    compressedSize = data.size.toLong()
-                    crc = CRC32().apply { update(data) }.value
-                }
-                zip.putNextEntry(entry)
-                zip.write(data)
-                zip.closeEntry()
-            }
-        }
+        ZipOutputStream(output).use { zip -> writeEntries(zip, entries) }
         return output.toByteArray()
+    }
+
+    /**
+     * 把条目直接流式写入 ZIP 输出流，避免像 [create] 那样在内存里再拼一份同样大小的归档。
+     * 备份中图片附件较多时，导出/同步的峰值内存可因此明显下降。
+     *
+     * 注意：本方法会关闭传入的 [output]（ZipOutputStream.close 需写入中央目录）。
+     */
+    fun write(entries: List<Pair<String, ByteArray>>, output: OutputStream) {
+        require(entries.isNotEmpty()) { "ZIP 备份不能为空" }
+        ZipOutputStream(output).use { zip -> writeEntries(zip, entries) }
+    }
+
+    /** 以 Store（不压缩）+ CRC32 的方式写入所有条目，保持与 macOS/iOS 读取器兼容。 */
+    private fun writeEntries(zip: ZipOutputStream, entries: List<Pair<String, ByteArray>>) {
+        entries.forEach { (path, data) ->
+            val entry = ZipEntry(path).apply {
+                method = ZipEntry.STORED
+                size = data.size.toLong()
+                compressedSize = data.size.toLong()
+                crc = CRC32().apply { update(data) }.value
+            }
+            zip.putNextEntry(entry)
+            zip.write(data)
+            zip.closeEntry()
+        }
     }
 
     /** 读取 ZIP 中的 StudyFlow JSON，兼容旧版纯 JSON。 */
@@ -59,6 +74,22 @@ object BackupArchive {
             }
         }
         return null
+    }
+
+    /**
+     * 一次性扫描 ZIP，返回所有条目的 路径→内容 映射。
+     * 备份中附件缺失、需要按路径多次回退查找时，用它避免每个附件都重新扫描整份归档。
+     */
+    fun readEntries(bytes: ByteArray): Map<String, ByteArray> {
+        if (!isArchive(bytes)) return emptyMap()
+        val result = LinkedHashMap<String, ByteArray>()
+        ZipInputStream(bytes.inputStream()).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                if (!entry.isDirectory) result[entry.name] = zip.readBytes()
+            }
+        }
+        return result
     }
 
     fun isArchive(bytes: ByteArray): Boolean =

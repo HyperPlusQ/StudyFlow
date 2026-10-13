@@ -58,11 +58,15 @@ class StudyRepository(private val db: AppDatabase) {
         }
 
         if (attachments != null) {
-            db.attachmentDao().deleteForAssignment(savedId)
-            if (attachments.isNotEmpty()) {
-                db.attachmentDao().insertAll(
-                    attachments.map { it.copy(id = 0, assignmentId = savedId) }
-                )
+            // 增量同步附件：只删除被移除的、只插入新增的，避免每次编辑都重写所有图片二进制。
+            val existing = db.attachmentDao().forAssignment(savedId)
+            val incomingExistingIds = attachments.mapNotNull { it.id.takeIf { id -> id != 0L } }.toSet()
+            existing.forEach { current ->
+                if (current.id !in incomingExistingIds) db.attachmentDao().delete(current.id)
+            }
+            val newAttachments = attachments.filter { it.id == 0L }
+            if (newAttachments.isNotEmpty()) {
+                db.attachmentDao().insertAll(newAttachments.map { it.copy(assignmentId = savedId) })
             }
         }
 

@@ -6,6 +6,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.hyperplusq.studyflow.BuildConfig
 import com.hyperplusq.studyflow.StudyFlowApp
 import com.hyperplusq.studyflow.data.AppSettings
 import com.hyperplusq.studyflow.data.SettingsRepository
@@ -212,12 +213,21 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
                 }
                 val response = "${release.version} · ${release.publishedAt.take(10)}"
                 settingsRepository.setLastGithubResponse(response)
-                announce("已是最新 Release：${release.version}")
-                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    com.hyperplusq.studyflow.system.GithubUpdateService.open(
-                        getApplication(),
-                        release.htmlUrl
+                if (com.hyperplusq.studyflow.system.GithubUpdateService.isNewer(
+                        release.version,
+                        BuildConfig.VERSION_NAME
                     )
+                ) {
+                    announce("发现新版本：${release.version}")
+                    // 仅在有新版本时才跳转到 Release 页面，避免只是检查更新就把用户带离应用。
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        com.hyperplusq.studyflow.system.GithubUpdateService.open(
+                            getApplication(),
+                            release.htmlUrl
+                        )
+                    }
+                } else {
+                    announce("已是最新 Release：${release.version}")
                 }
             } catch (c: CancellationException) {
                 throw c

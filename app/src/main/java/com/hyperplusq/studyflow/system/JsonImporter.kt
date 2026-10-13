@@ -147,11 +147,13 @@ object JsonImporter {
         val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
             ?: error("无法读取所选文件")
         // JSON 里的图片数据缺失或损坏时，回退到 ZIP 的 attachments/ 条目按需读取。
+        // 首次需要回退时一次性建立条目索引，避免每个附件都重新扫描整份归档。
+        var archiveEntries: Map<String, ByteArray>? = null
         val document = parse(String(BackupArchive.readDocument(bytes), Charsets.UTF_8)) {
                 assignmentRawId, attachmentRawId ->
-            BackupArchive.findEntry(bytes) { path ->
-                path.startsWith("attachments/$assignmentRawId/$attachmentRawId")
-            }
+            val entries = archiveEntries ?: BackupArchive.readEntries(bytes).also { archiveEntries = it }
+            val prefix = "attachments/$assignmentRawId/$attachmentRawId"
+            entries.entries.firstOrNull { it.key.startsWith(prefix) }?.value
         }
 
         validate(document)

@@ -13,9 +13,10 @@ import org.json.JSONObject
 object JsonExporter {
     /** 将数据库内容写入 ZIP；JSON 与图片附件封装在同一备份中。 */
     suspend fun export(context: Context, uri: Uri, repository: StudyRepository) {
-        val archive = buildArchive(repository)
+        // 直接流式写入目标文件，避免先构建整份归档字节数组再写入造成的额外内存峰值。
+        val entries = buildEntries(repository)
         context.contentResolver.openOutputStream(uri, "wt")?.use { output ->
-            output.write(archive)
+            BackupArchive.write(entries, output)
         } ?: error("无法打开导出文件")
     }
 
@@ -23,7 +24,11 @@ object JsonExporter {
      * 构建完整备份包：studyflow.json（内嵌 Base64 图片，供三端 JSON 解析），
      * 以及 attachments/ 目录下的原始图片文件（供需要直接读文件的场景使用）。
      */
-    internal suspend fun buildArchive(repository: StudyRepository): ByteArray {
+    internal suspend fun buildArchive(repository: StudyRepository): ByteArray =
+        BackupArchive.create(buildEntries(repository))
+
+    /** 组装备份条目；JSON 与原始图片共享同一份内存，不再额外复制归档。 */
+    private suspend fun buildEntries(repository: StudyRepository): List<Pair<String, ByteArray>> {
         val assignments = repository.assignmentsOnce()
         val document = buildDocument(repository, assignments)
         val entries = mutableListOf(
@@ -37,7 +42,7 @@ object JsonExporter {
                 entries += path to attachment.imageData
             }
         }
-        return BackupArchive.create(entries)
+        return entries
     }
 
     /** 构建可由 macOS/iOS/Android 共同读取的 JSON 文档。 */

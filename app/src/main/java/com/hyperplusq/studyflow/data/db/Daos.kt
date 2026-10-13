@@ -105,6 +105,9 @@ interface AttachmentDao {
     @Insert
     suspend fun insertAll(attachments: List<AttachmentEntity>)
 
+    @Query("DELETE FROM attachments WHERE id = :id")
+    suspend fun delete(id: Long)
+
     @Query("DELETE FROM attachments WHERE assignmentId = :assignmentId")
     suspend fun deleteForAssignment(assignmentId: Long)
 
@@ -167,8 +170,9 @@ interface SubmissionHistoryDao {
 
     @Query(
         """
-        INSERT OR IGNORE INTO submission_history(subjectId, method, lastUsedAt)
+        INSERT INTO submission_history(subjectId, method, lastUsedAt)
         VALUES(:subjectId, :method, :lastUsedAt)
+        ON CONFLICT(subjectId, method) DO UPDATE SET lastUsedAt = excluded.lastUsedAt
         """
     )
     suspend fun remember(subjectId: Long, method: String, lastUsedAt: Long)

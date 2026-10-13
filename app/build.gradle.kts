@@ -22,8 +22,8 @@ android {
         applicationId = "com.hyperplusq.studyflow"
         minSdk = 26
         targetSdk = 36
-        versionCode = 162
-        versionName = "1.6.2"
+        versionCode = 163
+        versionName = "1.6.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

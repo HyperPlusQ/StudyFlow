@@ -83,6 +83,11 @@ data class AttachmentEntity(
     val imageData: ByteArray,
     val createdAt: Long = System.currentTimeMillis()
 ) {
+    /**
+     * 仅比较身份与元数据，刻意跳过 [imageData]：
+     * 逐字节比较会让 Compose/StateFlow 的相等性判断在每次数据变更时扫描整张图片，
+     * 附件较多时开销巨大。附件行由自增主键唯一标识，比较 id 已足够。
+     */
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other !is AttachmentEntity) return false
@@ -90,7 +95,6 @@ data class AttachmentEntity(
             assignmentId == other.assignmentId &&
             fileName == other.fileName &&
             mimeType == other.mimeType &&
-            imageData.contentEquals(other.imageData) &&
             createdAt == other.createdAt
     }
 
@@ -99,7 +103,6 @@ data class AttachmentEntity(
         result = 31 * result + assignmentId.hashCode()
         result = 31 * result + fileName.hashCode()
         result = 31 * result + mimeType.hashCode()
-        result = 31 * result + imageData.contentHashCode()
         result = 31 * result + createdAt.hashCode()
         return result
     }

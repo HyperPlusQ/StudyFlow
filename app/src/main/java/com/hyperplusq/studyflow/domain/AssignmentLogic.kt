@@ -82,11 +82,15 @@ object SmartScoring {
 
     /** 按关注分数和截止时间智能排序。 */
     fun sort(items: List<AssignmentWithSubtasks>, now: Long = System.currentTimeMillis()): List<AssignmentWithSubtasks> =
-        items.sortedWith(
-            compareByDescending<AssignmentWithSubtasks> { score(it, now) }
-                .thenBy { it.assignment.dueDate ?: Long.MAX_VALUE }
-                .thenBy { it.assignment.createdAt }
-        )
+        // 先为每个作业计算一次分数（装饰），再排序，避免在比较器中重复计算 O(n log n) 次。
+        items
+            .map { it to score(it, now) }
+            .sortedWith(
+                compareByDescending<Pair<AssignmentWithSubtasks, Double>> { it.second }
+                    .thenBy { it.first.assignment.dueDate ?: Long.MAX_VALUE }
+                    .thenBy { it.first.assignment.createdAt }
+            )
+            .map { it.first }
 }
 
 object AssignmentQueries {
