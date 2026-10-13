@@ -164,6 +164,8 @@ enum DataExportService {
         }
 
         ((try? context.fetch(FetchDescriptor<TimeBlock>())) ?? []).forEach { context.delete($0) }
+        // 先清理旧附件，避免云盘恢复时同一 UUID 的图片在一次事务中冲突。
+        ((try? context.fetch(FetchDescriptor<ImageAttachment>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<Assignment>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<Subject>())) ?? []).forEach { context.delete($0) }
         ((try? context.fetch(FetchDescriptor<SubmissionHistoryEntry>())) ?? []).forEach { context.delete($0) }
@@ -212,7 +214,7 @@ enum DataExportService {
                         assignment: assignment
                     )
                 }
-            assignment.attachments = (record.attachments ?? [])
+            let restoredAttachments = (record.attachments ?? [])
                 .sorted { $0.createdAt < $1.createdAt }
                 .map {
                     ImageAttachment(
@@ -224,7 +226,10 @@ enum DataExportService {
                         assignment: assignment
                     )
                 }
+            assignment.attachments = restoredAttachments
             context.insert(assignment)
+            // 显式插入附件，确保恢复后的图片关系被完整写入同步快照。
+            restoredAttachments.forEach(context.insert)
         }
 
         document.timeBlocks.forEach { record in
@@ -463,6 +468,23 @@ enum DataExportService {
                 guard subjectIDs.contains(parentID) else {
                     throw SyncFileError.invalidSubjectHierarchy(subject.id)
                 }
+            }
+        }
+
+        // 检测科目层级的环（例如 A.parent = B 且 B.parent = A），避免后续层级遍历死循环。
+        let parentByID = Dictionary(
+            uniqueKeysWithValues: document.subjects.compactMap { subject in
+                subject.parentId.map { (subject.id, $0) }
+            }
+        )
+        for subject in document.subjects {
+            var seen: Set<UUID> = [subject.id]
+            var current = subject.parentId
+            while let currentID = current {
+                guard seen.insert(currentID).inserted else {
+                    throw SyncFileError.invalidSubjectHierarchy(subject.id)
+                }
+                current = parentByID[currentID]
             }
         }
 

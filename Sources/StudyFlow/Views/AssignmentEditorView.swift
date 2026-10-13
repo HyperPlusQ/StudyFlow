@@ -331,8 +331,10 @@ struct AssignmentEditorView: View {
         let cleanSubmission = submissionMethod.trimmingCharacters(in: .whitespacesAndNewlines)
 
         let assignment: Assignment
+        let previousSubjectId: UUID?
         switch mode {
         case .new:
+            previousSubjectId = nil
             assignment = Assignment(
                 title: cleanTitle,
                 details: cleanDetails,
@@ -345,6 +347,8 @@ struct AssignmentEditorView: View {
             )
             context.insert(assignment)
         case let .edit(existing):
+            // 先记录改动前的科目，供后续判断是否需要迁移“布置间隔”提醒。
+            previousSubjectId = existing.subjectId
             assignment = existing
             existing.title = cleanTitle
             existing.details = cleanDetails
@@ -359,7 +363,7 @@ struct AssignmentEditorView: View {
 
         reconcileSubtasks(for: assignment)
         reconcileAttachments(for: assignment)
-        updateSubjectRegistration(for: assignment)
+        updateSubjectRegistration(for: assignment, previousSubjectId: previousSubjectId)
         PersistentStore.save(context)
         NotificationManager.shared.schedule(for: assignment)
         NotificationManager.scheduleAllSubjectReminders(subjects: subjects, assignments: allAssignments(including: assignment))
@@ -377,19 +381,16 @@ struct AssignmentEditorView: View {
     }
 
     /// 新建作业或将作业移动到另一科目时，重置该科目的登记计时。
-    private func updateSubjectRegistration(for assignment: Assignment) {
-        let isNew: Bool
-        if case .new = mode { isNew = true } else { isNew = false }
-
-        if isNew, let id = subjectId {
+    private func updateSubjectRegistration(for assignment: Assignment, previousSubjectId: UUID?) {
+        if case .new = mode, let id = subjectId {
             if let subject = subjects.first(where: { $0.id == id }) {
                 subject.lastAssignmentRegisteredAt = assignment.createdAt
             }
             return
         }
 
-        guard case let .edit(existing) = mode, existing.subjectId != subjectId else { return }
-        if let oldID = existing.subjectId,
+        guard case .edit = mode, previousSubjectId != subjectId else { return }
+        if let oldID = previousSubjectId,
            let oldSubject = subjects.first(where: { $0.id == oldID }) {
             NotificationManager.shared.cancelSubjectReminder(for: oldSubject.id)
         }
