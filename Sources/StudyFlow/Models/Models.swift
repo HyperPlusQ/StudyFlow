@@ -174,7 +174,7 @@ final class ImageAttachment {
     @Attribute(.unique) var id: UUID
     var fileName: String
     var mimeType: String
-    var imageData: Data
+    @Attribute(.externalStorage) var imageData: Data
     var createdAt: Date
     var assignment: Assignment?
 
