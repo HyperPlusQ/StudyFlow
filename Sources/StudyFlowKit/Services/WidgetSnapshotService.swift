@@ -21,16 +21,16 @@ enum WidgetSnapshotService {
         let assignments = try context.fetch(FetchDescriptor<Assignment>())
         let now = Date.now
         let active = assignments.filter { !$0.isCompleted }
-        let calendar = Calendar.current
 
         let dueToday = active.filter {
             guard let due = $0.dueDate else { return false }
-            return calendar.isDate(due, inSameDayAs: now)
+            return due <= now.endOfDay
         }
         let overdue = active.filter {
             guard let due = $0.dueDate else { return false }
             return due < now
         }
+        let noDate = active.filter { $0.dueDate == nil }.count
         let subjectNames = Dictionary(
             subjects.map { ($0.id, $0.name) },
             uniquingKeysWith: { first, _ in first }
@@ -57,6 +57,7 @@ enum WidgetSnapshotService {
             activeCount: active.count,
             dueTodayCount: dueToday.count,
             overdueCount: overdue.count,
+            noDateCount: noDate,
             completedCount: assignments.count - active.count,
             items: items
         )

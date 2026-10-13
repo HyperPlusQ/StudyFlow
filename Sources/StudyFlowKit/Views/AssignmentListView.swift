@@ -16,11 +16,9 @@ struct AssignmentListView: View {
     @State private var schedulingAssignment: Assignment?
     @State private var previewedAttachmentID: UUID?
 
-    private var subjectMap: [UUID: Subject] {
-        Dictionary(uniqueKeysWithValues: subjects.map { ($0.id, $0) })
-    }
-
-    private var visibleAssignments: [Assignment] {
+    /// 根据当前 scope / 筛选条件计算可见作业。
+    /// 由 `body` 在每次渲染时调用一次，结果传递给各个子视图，避免重复计算。
+    private func makeVisibleAssignments(subjectMap: [UUID: Subject]) -> [Assignment] {
         var items = assignments
         items = scope.scope == .completed ? items.filter(\.isCompleted) : items.filter { !$0.isCompleted }
 
@@ -37,14 +35,13 @@ struct AssignmentListView: View {
         }
 
         if let subjectId = scope.subjectId {
-            let ids = Set(subjects
-                .filter { $0.id == subjectId }
-                .flatMap { StudyOperations.descendants(of: $0, in: subjects) }
-                .map(\.id)
-                + [subjectId])
+            var ids: Set<UUID> = [subjectId]
+            if let subject = subjects.first(where: { $0.id == subjectId }) {
+                ids = SubjectHierarchy(subjects).descendantIds(of: subject)
+            }
             items = items.filter { task in
-                guard let subjectId = task.subjectId else { return false }
-                return ids.contains(subjectId)
+                guard let taskSubjectId = task.subjectId else { return false }
+                return ids.contains(taskSubjectId)
             }
         }
 
@@ -70,13 +67,15 @@ struct AssignmentListView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            summaryBar
+        let subjectMap = Dictionary(uniqueKeysWithValues: subjects.map { ($0.id, $0) })
+        let visibleAssignments = makeVisibleAssignments(subjectMap: subjectMap)
+        return VStack(spacing: 0) {
+            summaryBar(visibleAssignments: visibleAssignments)
             Divider()
             if visibleAssignments.isEmpty {
                 emptyState
             } else {
-                assignmentList
+                assignmentList(visibleAssignments: visibleAssignments, subjectMap: subjectMap)
             }
         }
         .fullScreenCover(
@@ -172,16 +171,16 @@ struct AssignmentListView: View {
     }
 
     @ViewBuilder
-    private var assignmentList: some View {
+    private func assignmentList(visibleAssignments: [Assignment], subjectMap: [UUID: Subject]) -> some View {
         List {
-            assignmentListContent
+            assignmentListContent(visibleAssignments: visibleAssignments, subjectMap: subjectMap)
         }
         .listStyle(.inset)
         .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder
-    private var assignmentListContent: some View {
+    private func assignmentListContent(visibleAssignments: [Assignment], subjectMap: [UUID: Subject]) -> some View {
                     Section {
                         ForEach(Array(visibleAssignments.enumerated()), id: \.element.id) { index, item in
                             let task: Assignment = item
@@ -207,7 +206,7 @@ struct AssignmentListView: View {
                     }
     }
 
-    private var summaryBar: some View {
+    private func summaryBar(visibleAssignments: [Assignment]) -> some View {
         HStack(spacing: 10) {
             Label("\(visibleAssignments.count) 项", systemImage: "list.bullet")
                 .foregroundStyle(.secondary)
@@ -256,7 +255,7 @@ struct AssignmentListView: View {
 
     @MainActor
     private func synchronizeCalendarAfterCompletion(for assignment: Assignment) {
-        let subjectName = assignment.subjectId.flatMap { subjectMap[$0]?.name }
+        let subjectName = assignment.subjectId.flatMap { id in subjects.first(where: { $0.id == id })?.name }
 
         Task {
             do {

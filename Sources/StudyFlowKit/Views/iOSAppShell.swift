@@ -176,16 +176,11 @@ struct SubjectsView: View {
     @State private var expandedSubjects: Set<UUID> = []
     @State private var pendingDelete: Subject?
 
-    private var roots: [Subject] {
-        subjects.filter { $0.parentId == nil }.sorted { $0.sortOrder < $1.sortOrder }
-    }
-
-    private var activeAssignments: [Assignment] {
-        assignments.filter { !$0.isCompleted }
-    }
-
     var body: some View {
-        List {
+        let hierarchy = SubjectHierarchy(subjects)
+        let roots = hierarchy.roots()
+        let activeAssignments = assignments.filter { !$0.isCompleted }
+        return List {
             Section {
                 if roots.isEmpty {
                     ContentUnavailableView(
@@ -195,7 +190,12 @@ struct SubjectsView: View {
                     )
                 } else {
                     ForEach(roots) { root in
-                        subjectOutline(for: root, level: 0)
+                        subjectOutline(
+                            for: root,
+                            level: 0,
+                            hierarchy: hierarchy,
+                            activeAssignments: activeAssignments
+                        )
                     }
                 }
             }
@@ -232,13 +232,16 @@ struct SubjectsView: View {
         }
     }
 
-    private func subjectOutline(for subject: Subject, level: Int) -> AnyView {
-        let children = subjects
-            .filter { $0.parentId == subject.id }
-            .sorted { $0.sortOrder < $1.sortOrder }
+    private func subjectOutline(
+        for subject: Subject,
+        level: Int,
+        hierarchy: SubjectHierarchy,
+        activeAssignments: [Assignment]
+    ) -> AnyView {
+        let children = hierarchy.children(of: subject)
 
         if children.isEmpty {
-            return AnyView(subjectRow(subject, level: level))
+            return AnyView(subjectRow(subject, level: level, hierarchy: hierarchy, activeAssignments: activeAssignments))
         } else {
             return AnyView(DisclosureGroup(
                 isExpanded: Binding(
@@ -253,7 +256,7 @@ struct SubjectsView: View {
                 )
             ) {
                 ForEach(children) { child in
-                    subjectOutline(for: child, level: level + 1)
+                    subjectOutline(for: child, level: level + 1, hierarchy: hierarchy, activeAssignments: activeAssignments)
                 }
             } label: {
                 HStack(spacing: 10) {
@@ -268,10 +271,13 @@ struct SubjectsView: View {
         }
     }
 
-    private func subjectRow(_ subject: Subject, level: Int) -> some View {
-        let descendantIds = Set(
-            StudyOperations.descendants(of: subject, in: subjects).map(\.id) + [subject.id]
-        )
+    private func subjectRow(
+        _ subject: Subject,
+        level: Int,
+        hierarchy: SubjectHierarchy,
+        activeAssignments: [Assignment]
+    ) -> some View {
+        let descendantIds = hierarchy.descendantIds(of: subject)
         let count = activeAssignments.filter {
             guard let subjectId = $0.subjectId else { return false }
             return descendantIds.contains(subjectId)

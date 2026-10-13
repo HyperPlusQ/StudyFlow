@@ -217,7 +217,7 @@ private struct StudyFlowWidgetView: View {
             if let snapshot = entry.snapshot {
                 HStack(spacing: 7) {
                     statistic("已完成", snapshot.completedCount, symbol: "checkmark.circle.fill", tint: .green)
-                    statistic("无日期", snapshot.activeCount - snapshot.dueTodayCount, symbol: "calendar", tint: .blue)
+                    statistic("无日期", snapshot.noDateCount, symbol: "calendar", tint: .blue)
                     statistic("逾期", snapshot.overdueCount, symbol: "exclamationmark.triangle.fill", tint: .red)
                 }
             }
@@ -376,6 +376,7 @@ private extension WidgetSnapshot {
         activeCount: 3,
         dueTodayCount: 1,
         overdueCount: 1,
+        noDateCount: 1,
         completedCount: 8,
         items: [
             Item(

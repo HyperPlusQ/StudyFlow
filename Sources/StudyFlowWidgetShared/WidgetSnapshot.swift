@@ -39,6 +39,7 @@ public struct WidgetSnapshot: Codable, Sendable {
     public let activeCount: Int
     public let dueTodayCount: Int
     public let overdueCount: Int
+    public let noDateCount: Int
     public let completedCount: Int
     public let items: [Item]
 
@@ -47,6 +48,7 @@ public struct WidgetSnapshot: Codable, Sendable {
         activeCount: Int,
         dueTodayCount: Int,
         overdueCount: Int,
+        noDateCount: Int,
         completedCount: Int,
         items: [Item]
     ) {
@@ -54,6 +56,7 @@ public struct WidgetSnapshot: Codable, Sendable {
         self.activeCount = activeCount
         self.dueTodayCount = dueTodayCount
         self.overdueCount = overdueCount
+        self.noDateCount = noDateCount
         self.completedCount = completedCount
         self.items = items
     }
