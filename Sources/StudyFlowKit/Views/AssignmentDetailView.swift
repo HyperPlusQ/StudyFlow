@@ -76,6 +76,10 @@ struct AssignmentDetailView: View {
                 if assignment.calendarEventIdentifier != nil {
                     _ = try? CalendarService.shared.removeEvent(for: assignment)
                 }
+                // 解除时间块关联，避免产生指向已删除作业的悬挂引用，导致备份校验失败。
+                for block in blocks where block.assignmentId == assignment.id {
+                    block.assignmentId = nil
+                }
                 context.delete(assignment)
                 PersistentStore.save(context)
             }

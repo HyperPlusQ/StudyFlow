@@ -4,13 +4,22 @@ import SwiftData
 @MainActor
 enum StudyOperations {
     /// 递归收集指定科目的全部子科目。
+    /// 使用一次性构建的“父科目 → 子科目”索引（整体 O(n)），并以 visited 集合防止
+    /// 科目层级出现环（例如 A.parent = B 且 B.parent = A）时无限循环。
     static func descendants(of subject: Subject, in subjects: [Subject]) -> [Subject] {
+        var childrenByParent: [UUID: [Subject]] = [:]
+        for candidate in subjects {
+            guard let parentId = candidate.parentId else { continue }
+            childrenByParent[parentId, default: []].append(candidate)
+        }
+        var visited: Set<UUID> = [subject.id]
         var queue = [subject]
         var collected: [Subject] = []
         while let current = queue.popLast() {
-            let children = subjects.filter { $0.parentId == current.id }
-            collected.append(contentsOf: children)
-            queue.append(contentsOf: children)
+            for child in childrenByParent[current.id] ?? [] where visited.insert(child.id).inserted {
+                collected.append(child)
+                queue.append(child)
+            }
         }
         return collected
     }

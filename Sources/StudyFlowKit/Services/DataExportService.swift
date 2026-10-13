@@ -453,6 +453,23 @@ enum DataExportService {
             }
         }
 
+        // 检测科目层级的环（例如 A.parent = B 且 B.parent = A），避免后续层级遍历死循环。
+        let parentByID = Dictionary(
+            uniqueKeysWithValues: document.subjects.compactMap { subject in
+                subject.parentId.map { (subject.id, $0) }
+            }
+        )
+        for subject in document.subjects {
+            var seen: Set<UUID> = [subject.id]
+            var current = subject.parentId
+            while let currentID = current {
+                guard seen.insert(currentID).inserted else {
+                    throw SyncFileError.invalidSubjectHierarchy(subject.id)
+                }
+                current = parentByID[currentID]
+            }
+        }
+
         try requireUniqueIDs(document.assignments.flatMap(\.subtasks).map(\.id))
         try requireUniqueIDs(document.assignments.compactMap(\.attachments).flatMap { $0 }.map(\.id))
 

@@ -202,7 +202,9 @@ final class ICloudSyncCoordinator {
     }
 
     /// 比较并更新本地/云端同步文件；只在后台线程调用。
-    /// 本地镜像每次用当前数据库重建（保持原比较时间戳），推送时直接复制文件。
+    /// 仅在需要把本地内容推送到云端时才用当前数据库重建本地镜像
+    /// （保持原比较时间戳）；“云端较新/时间相同”的路径不会读取本地镜像内容，
+    /// 因此跳过整包 Base64 重打包，避免无谓开销。
     private nonisolated static func mergeFiles(
         container: ModelContainer,
         localURL: URL,
@@ -213,20 +215,17 @@ final class ICloudSyncCoordinator {
         let cloudExists = fileManager.fileExists(atPath: cloudURL.path)
         let backgroundContext = ModelContext(container)
 
-        if localExists {
-            let localDate = try DataExportService.modificationDate(of: localURL)
-            try DataExportService.writeArchive(
-                context: backgroundContext,
-                to: localURL,
-                modificationDate: localDate
-            )
-        }
-
         if localExists, cloudExists {
             let localDate = try DataExportService.modificationDate(of: localURL)
             let cloudDate = try DataExportService.modificationDate(of: cloudURL)
 
             if localDate > cloudDate {
+                // 本地较新：按当前数据库重建本地镜像后再推送。
+                try DataExportService.writeArchive(
+                    context: backgroundContext,
+                    to: localURL,
+                    modificationDate: localDate
+                )
                 try copyReplacingFile(from: localURL, to: cloudURL)
                 try fileManager.setAttributes(
                     [.modificationDate: localDate],
@@ -245,32 +244,40 @@ final class ICloudSyncCoordinator {
             return .finished("同步完成：两端修改时间相同，无需覆盖。")
         }
 
+        if localExists {
+            // 云端尚不存在：重建本地镜像并写入云端。
+            let localDate = try DataExportService.modificationDate(of: localURL)
+            try DataExportService.writeArchive(
+                context: backgroundContext,
+                to: localURL,
+                modificationDate: localDate
+            )
+            try copyReplacingFile(from: localURL, to: cloudURL)
+            try fileManager.setAttributes(
+                [.modificationDate: localDate],
+                ofItemAtPath: cloudURL.path
+            )
+            return .finished("已将本地同步文件写入 iCloud。")
+        }
+
         if cloudExists {
             let cloudDate = try DataExportService.modificationDate(of: cloudURL)
             let data = try Data(contentsOf: cloudURL)
             return .pulled(data: data, date: cloudDate, message: "已从 iCloud 文件更新本地数据。")
         }
 
-        let timestamp = localExists
-            ? try DataExportService.modificationDate(of: localURL)
-            : Date.now
-        if !localExists {
-            try DataExportService.writeArchive(
-                context: backgroundContext,
-                to: localURL,
-                modificationDate: timestamp
-            )
-        }
+        let timestamp = Date.now
+        try DataExportService.writeArchive(
+            context: backgroundContext,
+            to: localURL,
+            modificationDate: timestamp
+        )
         try copyReplacingFile(from: localURL, to: cloudURL)
         try fileManager.setAttributes(
             [.modificationDate: timestamp],
             ofItemAtPath: cloudURL.path
         )
-        return .finished(
-            localExists
-                ? "已将本地同步文件写入 iCloud。"
-                : "已创建本地与 iCloud 同步文件。"
-        )
+        return .finished("已创建本地与 iCloud 同步文件。")
     }
 
     /// 文件到文件的复制替换：避免把整份 ZIP 读回内存。
