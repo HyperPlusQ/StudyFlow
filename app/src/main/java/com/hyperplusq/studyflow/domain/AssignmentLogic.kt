@@ -1,5 +1,6 @@
 package com.hyperplusq.studyflow.domain
 
+import com.hyperplusq.studyflow.data.db.AssignmentItem
 import com.hyperplusq.studyflow.data.db.AssignmentStatus
 import com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks
 import com.hyperplusq.studyflow.data.db.Priority
@@ -57,7 +58,7 @@ data class AssignmentFilter(
 
 object SmartScoring {
     /** 按截止时间、优先级和权重计算关注分数。 */
-    fun score(item: AssignmentWithSubtasks, now: Long = System.currentTimeMillis()): Double {
+    fun score(item: AssignmentItem, now: Long = System.currentTimeMillis()): Double {
         val assignment = item.assignment
         if (assignment.status == AssignmentStatus.COMPLETED.rawValue) return -1.0
         val priority = Priority.fromRaw(assignment.priority)
@@ -81,12 +82,12 @@ object SmartScoring {
     }
 
     /** 按关注分数和截止时间智能排序。 */
-    fun sort(items: List<AssignmentWithSubtasks>, now: Long = System.currentTimeMillis()): List<AssignmentWithSubtasks> =
+    fun <T : AssignmentItem> sort(items: List<T>, now: Long = System.currentTimeMillis()): List<T> =
         // 先为每个作业计算一次分数（装饰），再排序，避免在比较器中重复计算 O(n log n) 次。
         items
             .map { it to score(it, now) }
             .sortedWith(
-                compareByDescending<Pair<AssignmentWithSubtasks, Double>> { it.second }
+                compareByDescending<Pair<T, Double>> { it.second }
                     .thenBy { it.first.assignment.dueDate ?: Long.MAX_VALUE }
                     .thenBy { it.first.assignment.createdAt }
             )
@@ -95,7 +96,7 @@ object SmartScoring {
 
 object AssignmentQueries {
     /** 判断作业是否符合当前搜索和筛选条件。 */
-    fun matches(item: AssignmentWithSubtasks, filter: AssignmentFilter, scope: ListScope): Boolean {
+    fun matches(item: AssignmentItem, filter: AssignmentFilter, scope: ListScope): Boolean {
         val a = item.assignment
         if (scope == ListScope.COMPLETED && a.status != AssignmentStatus.COMPLETED.rawValue) return false
         if (scope != ListScope.COMPLETED && a.status == AssignmentStatus.COMPLETED.rawValue) return false

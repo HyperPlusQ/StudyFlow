@@ -72,6 +72,9 @@ object ReminderScheduler {
         manager.cancel(subjectPendingIntent(context, subjectId))
     }
 
+    /** 把 64 位自增 id 折叠成稳定的 32 位值，避免直接 Long→Int 截断丢失高位后碰撞。 */
+    internal fun stableReminderId(id: Long): Int = (id xor (id ushr 32)).toInt()
+
     private fun pendingIntent(context: Context, assignmentId: Long): PendingIntent {
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             action = ASSIGNMENT_ACTION
@@ -79,14 +82,15 @@ object ReminderScheduler {
         }
         return PendingIntent.getBroadcast(
             context,
-            assignmentId.toInt(),
+            stableReminderId(assignmentId),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
     }
 
     private fun subjectPendingIntent(context: Context, subjectId: Long): PendingIntent {
-        val requestCode = SUBJECT_REQUEST_BASE + subjectId.toInt()
+        // 用稳定的 32 位折叠值并限制到 30 位，再加上基数，避免溢出成负数。
+        val requestCode = SUBJECT_REQUEST_BASE + (stableReminderId(subjectId) and 0x3FFFFFFF)
         val intent = Intent(context, ReminderReceiver::class.java).apply {
             action = SUBJECT_ACTION
             putExtra("subject_id", subjectId)

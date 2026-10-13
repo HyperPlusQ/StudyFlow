@@ -20,6 +20,10 @@ interface SubjectDao {
     @Query("SELECT * FROM subjects WHERE id = :id")
     suspend fun findById(id: Long): SubjectEntity?
 
+    /** 本科目下最新一条作业的创建时间，用于布置间隔提醒的基准时间。 */
+    @Query("SELECT MAX(createdAt) FROM assignments WHERE subjectId = :subjectId")
+    suspend fun latestAssignmentCreatedAt(subjectId: Long): Long?
+
     @Insert
     suspend fun insert(subject: SubjectEntity): Long
 
@@ -80,6 +84,11 @@ interface AssignmentDao {
     @Transaction
     @Query("SELECT * FROM assignments")
     suspend fun allOnceWithSubtasks(): List<AssignmentWithSubtasks>
+
+    /** 同 [allOnceWithSubtasks]，但不加载图片附件，供小组件等只需计数的场景使用。 */
+    @Transaction
+    @Query("SELECT * FROM assignments")
+    suspend fun allOnceWithSubtasksWithoutAttachments(): List<AssignmentWithSubtasksOnly>
 
     @Query("DELETE FROM assignments WHERE id = :id")
     suspend fun delete(id: Long)
@@ -179,7 +188,6 @@ interface SubmissionHistoryDao {
 
     @Query("SELECT * FROM submission_history")
     suspend fun allOnce(): List<SubmissionHistoryEntity>
-
     @Query("DELETE FROM submission_history WHERE id = :id")
     suspend fun delete(id: Long)
 

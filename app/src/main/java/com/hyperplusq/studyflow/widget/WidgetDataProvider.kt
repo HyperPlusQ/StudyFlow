@@ -25,7 +25,7 @@ internal object WidgetDataProvider {
     fun load(context: Context): WidgetSnapshot {
         val repository = StudyRepository(AppDatabase.get(context))
         return runBlocking {
-            val assignments = repository.assignmentsOnce()
+            val assignments = repository.assignmentSummariesOnce()
             val subjects = repository.subjectsOnce().associateBy { it.id }
             val now = System.currentTimeMillis()
             val active = SmartScoring.sort(

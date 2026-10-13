@@ -132,6 +132,14 @@ class StudyRepository(private val db: AppDatabase) {
     suspend fun subjectsOnce(): List<SubjectEntity> = db.subjectDao().allOnce()
     suspend fun assignmentsOnce(): List<com.hyperplusq.studyflow.data.db.AssignmentWithSubtasks> =
         db.assignmentDao().allOnceWithSubtasks()
+
+    /** 同 [assignmentsOnce]，但不加载图片附件，供小组件等只需计数的场景使用。 */
+    suspend fun assignmentSummariesOnce(): List<com.hyperplusq.studyflow.data.db.AssignmentWithSubtasksOnly> =
+        db.assignmentDao().allOnceWithSubtasksWithoutAttachments()
+
+    /** 科目下最新一条作业的创建时间，用于布置间隔提醒。 */
+    suspend fun latestAssignmentCreatedAt(subjectId: Long): Long? =
+        db.subjectDao().latestAssignmentCreatedAt(subjectId)
     suspend fun timeBlocksOnce(): List<TimeBlockEntity> = db.timeBlockDao().allOnce()
     suspend fun submissionHistoryOnce(): List<SubmissionHistoryEntity> =
         db.submissionHistoryDao().allOnce()

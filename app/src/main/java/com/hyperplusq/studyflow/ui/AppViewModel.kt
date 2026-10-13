@@ -80,9 +80,9 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
 
     /** 保存新建或修改后的科目。 */
     fun saveSubject(subject: SubjectEntity) = launchOp("已保存科目") {
-        repository.saveSubject(subject)
-        // 重新读取数据库，保留仓储层自动补全的登记时间后再刷新提醒。
-        refreshSubjectReminders(settingsRepository.settings.first().notificationsEnabled)
+        val id = repository.saveSubject(subject)
+        // 只刷新该科目的提醒，避免每次保存都全量回扫作业表。
+        refreshSubjectReminder(id, settingsRepository.settings.first().notificationsEnabled)
     }
 
     /**
@@ -109,6 +109,24 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    /**
+     * 只刷新指定科目的“作业布置间隔”提醒。
+     * 保存单个作业/科目时用它替代全量 [refreshSubjectReminders]，避免每次操作都回扫所有作业。
+     */
+    private suspend fun refreshSubjectReminder(subjectId: Long?, enabled: Boolean) {
+        if (subjectId == null) return
+        if (!enabled) {
+            ReminderScheduler.cancelSubject(getApplication(), subjectId)
+            return
+        }
+        val subject = repository.subject(subjectId) ?: return
+        ReminderScheduler.scheduleSubject(
+            getApplication(),
+            subject,
+            repository.latestAssignmentCreatedAt(subjectId)
+        )
+    }
+
     /** 删除科目并保留关联作业。 */
     fun deleteSubject(subject: SubjectEntity) = launchOp("已删除科目") {
         ReminderScheduler.cancelSubject(getApplication(), subject.id)
@@ -131,7 +149,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         if (notificationsEnabled) {
             ReminderScheduler.schedule(getApplication(), saved)
         }
-        refreshSubjectReminders(notificationsEnabled)
+        refreshSubjectReminder(saved.subjectId, notificationsEnabled)
         syncCalendarIfPossible(saved, syncCalendar)
     }
 

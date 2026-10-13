@@ -151,15 +151,44 @@ data class SubmissionHistoryEntity(
     val lastUsedAt: Long = System.currentTimeMillis()
 )
 
+/**
+ * 作业条目的公共接口：让「含图片附件」与「不含图片附件」两种查询结果
+ * 复用同一套排序（[com.hyperplusq.studyflow.domain.SmartScoring]）与筛选逻辑。
+ */
+interface AssignmentItem {
+    val assignment: AssignmentEntity
+    val subtasks: List<SubtaskEntity>
+    val completedSubtaskCount: Int
+    val progress: Float
+}
+
 data class AssignmentWithSubtasks(
-    @Embedded val assignment: AssignmentEntity,
+    @Embedded override val assignment: AssignmentEntity,
     @Relation(parentColumn = "id", entityColumn = "assignmentId")
-    val subtasks: List<SubtaskEntity>,
+    override val subtasks: List<SubtaskEntity>,
     @Relation(parentColumn = "id", entityColumn = "assignmentId")
     val attachments: List<AttachmentEntity>
-) {
-    val completedSubtaskCount: Int get() = subtasks.count { it.isCompleted }
-    val progress: Float
+) : AssignmentItem {
+    override val completedSubtaskCount: Int get() = subtasks.count { it.isCompleted }
+    override val progress: Float
+        get() = when {
+            subtasks.isEmpty() && assignment.status == AssignmentStatus.COMPLETED.rawValue -> 1f
+            subtasks.isEmpty() -> 0f
+            else -> completedSubtaskCount.toFloat() / subtasks.size
+        }
+}
+
+/**
+ * 与 [AssignmentWithSubtasks] 相同，但**不加载图片附件**。
+ * 供小组件等只需要计数、不需要图片二进制的场景使用，避免一次性把全部图片读入内存。
+ */
+data class AssignmentWithSubtasksOnly(
+    @Embedded override val assignment: AssignmentEntity,
+    @Relation(parentColumn = "id", entityColumn = "assignmentId")
+    override val subtasks: List<SubtaskEntity>
+) : AssignmentItem {
+    override val completedSubtaskCount: Int get() = subtasks.count { it.isCompleted }
+    override val progress: Float
         get() = when {
             subtasks.isEmpty() && assignment.status == AssignmentStatus.COMPLETED.rawValue -> 1f
             subtasks.isEmpty() -> 0f

@@ -53,7 +53,11 @@ class ReminderReceiver : BroadcastReceiver() {
                         .setContentText("“${subject.name}”距离上一次登记作业已过 $interval 天。")
                         .setAutoCancel(true)
                         .build()
-                    manager.notify(subjectNotificationId(subject.id), notification)
+                    manager.notify(
+                        SUBJECT_TAG,
+                        ReminderScheduler.stableReminderId(subject.id),
+                        notification
+                    )
                 } else {
                     val assignment = app.repository.assignment(assignmentId)?.assignment
                         ?: return@launch
@@ -69,7 +73,11 @@ class ReminderReceiver : BroadcastReceiver() {
                         .setContentText(assignment.title)
                         .setAutoCancel(true)
                         .build()
-                    manager.notify(assignmentId.toInt(), notification)
+                    manager.notify(
+                        ASSIGNMENT_TAG,
+                        ReminderScheduler.stableReminderId(assignmentId),
+                        notification
+                    )
                 }
             } finally {
                 pending.finish()
@@ -90,6 +98,8 @@ class ReminderReceiver : BroadcastReceiver() {
         }
     }
 
-    private fun subjectNotificationId(subjectId: Long): Int =
-        (Int.MAX_VALUE / 2) + subjectId.toInt()
+    private companion object {
+        const val SUBJECT_TAG = "subject_assignment_reminders"
+        const val ASSIGNMENT_TAG = "due_soon"
+    }
 }
